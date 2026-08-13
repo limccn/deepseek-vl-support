@@ -8,7 +8,7 @@ import { describe, listModels, modelIdMatches, VisionSizeError } from "./client.
 import { humanBytes, maskApiKey, resolveConfig } from "./config.ts";
 import { PKG_NAME } from "./identity.ts";
 
-const SERVER_VERSION = "0.1.0";
+const SERVER_VERSION = "0.1.2";
 const PROTOCOL_VERSION = "2024-11-05";
 
 interface JsonRpcRequest {
@@ -86,7 +86,7 @@ async function callDescribeImage(params: Record<string, unknown>): Promise<{ tex
 async function callVisionStatus(): Promise<{ text: string; isError: boolean }> {
   const cfg = resolveConfig(process.cwd(), homedir());
   const lines = [
-    `[deepseek-vl] vision_status 视觉状态`,
+    `[deepseek-vl-support] vision_status 视觉状态`,
     `  enabled : ${cfg.enabled}`,
     `  baseUrl : ${cfg.baseUrl}`,
     `  model   : ${cfg.model || "(not set 未设置)"}`,

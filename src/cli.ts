@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// deepseek-vl — CLI entry (bin alias). Zero-dependency hand-rolled arg
-// parsing; subcommands: describe / doctor / config / install / uninstall /
-// mcp / version.
+// deepseek-vl-support — CLI entry (single bin named after the package, so
+// npx resolves it by package name). Zero-dependency hand-rolled arg parsing;
+// subcommands: describe / doctor / config / install / uninstall / mcp / version.
 import { join } from "node:path";
 import { describe, VisionSizeError } from "./client.ts";
 import { runDoctor } from "./doctor.ts";
@@ -18,7 +18,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.2";
 
 interface ParsedArgs {
   flags: Map<string, string>;
@@ -71,22 +71,22 @@ function parseArgs(argv: string[]): ParsedArgs {
 }
 
 function fail(msg: string): never {
-  process.stderr.write(`[deepseek-vl] error: ${msg}\n`);
+  process.stderr.write(`[deepseek-vl-support] error: ${msg}\n`);
   process.exit(1);
 }
 
 function printHelp(): void {
   process.stdout.write(
-    `deepseek-vl v${VERSION} — vision for DeepSeek in Claude Code / Codex
+    `deepseek-vl-support v${VERSION} — vision for DeepSeek in Claude Code / Codex
 
 Usage:
-  deepseek-vl describe <image-file> [question...]   Describe an image (text output)
-  deepseek-vl doctor [--url <baseUrl>] [--all]      Diagnose the vision endpoint
-  deepseek-vl config [get [key] | set <key> <value> | path] [--global]
-  deepseek-vl install [options]                     One-shot installer (wizard)
-  deepseek-vl uninstall [options]                   Remove installed artifacts
-  deepseek-vl mcp                                  Run the MCP stdio server (for Codex)
-  deepseek-vl version                              Print version
+  deepseek-vl-support describe <image-file> [question...]   Describe an image (text output)
+  deepseek-vl-support doctor [--url <baseUrl>] [--all]      Diagnose the vision endpoint
+  deepseek-vl-support config [get [key] | set <key> <value> | path] [--global]
+  deepseek-vl-support install [options]                     One-shot installer (wizard)
+  deepseek-vl-support uninstall [options]                   Remove installed artifacts
+  deepseek-vl-support mcp                                  Run the MCP stdio server (for Codex)
+  deepseek-vl-support version                              Print version
 
 install options: --target claude|codex|both --global --update --dry-run
                  --non-interactive --preset <id> --base-url <url> --model <id>
@@ -114,7 +114,7 @@ async function cmdDescribe(args: ParsedArgs): Promise<void> {
   } catch (e) {
     if (e instanceof VisionSizeError) {
       process.stderr.write(
-        `[deepseek-vl] ${e.message}\n` +
+        `[deepseek-vl-support] ${e.message}\n` +
           `  hint: compress/crop the image, then retry. 请压缩或裁剪图片后重试。\n`,
       );
       process.exit(1);
@@ -178,7 +178,7 @@ function cmdConfig(args: ParsedArgs): void {
   }
 
   if (sub === "set") {
-    if (!key || rest.length === 0) fail("usage: deepseek-vl config set <key> <value>");
+    if (!key || rest.length === 0) fail("usage: deepseek-vl-support config set <key> <value>");
     const value = rest.join(" ");
     const paths = configPaths(cwd);
     const file = global ? paths.globalFile : paths.projectFile;
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
       return;
     case "version":
     case "--version":
-      process.stdout.write(`deepseek-vl v${VERSION}\n`);
+      process.stdout.write(`deepseek-vl-support v${VERSION}\n`);
       return;
     case undefined:
     case "help":
@@ -298,6 +298,6 @@ async function runUninstallFromCli(args: ParsedArgs): Promise<void> {
 }
 
 main().catch((e) => {
-  process.stderr.write(`[deepseek-vl] unexpected error: ${e instanceof Error ? e.stack ?? e.message : e}\n`);
+  process.stderr.write(`[deepseek-vl-support] unexpected error: ${e instanceof Error ? e.stack ?? e.message : e}\n`);
   process.exit(1);
 });

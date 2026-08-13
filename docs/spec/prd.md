@@ -70,11 +70,11 @@ Windows Server 2022；node v24.14.1、npm 11.11.0、python 3.12.9、git 2.53.0 �
 | D3 | 安装作用域 | **默认项目级**（`.claude/`、`.codex/`、`.deepseek-vl/`），`--global` 可选（`~/.claude`、`~/.codex`） |
 | D4 | 文档语言 | 中英双语（README、skill 指令、安装向导文案） |
 | D5 | 验收方式 | mock 视觉服务器自动化验收 + 真实端点 E2E 作为 README 可选手册步骤 |
-| D6 | 包名与发布 | npm 包 `deepseek-vl-support`（bin 别名 `deepseek-vl`），公开发布 npm，MIT |
+| D6 | 包名与发布 | npm 包 `deepseek-vl-support`（bin 单一条目 `deepseek-vl-support`，与包名同名；0.1.0 曾用别名 `deepseek-vl`，0.1.1 起统一单同名 bin——标准发布形态；npx 在包目录内报错是命中本地 spec、跳过安装的运行位置问题，非 bin 别名所致），公开发布 npm，MIT |
 
 ## Requirements
 
-- **R1 核心视觉客户端**（npm 包 `deepseek-vl-support`，bin 别名 `deepseek-vl`，Node ≥18，零运行时依赖）：
+- **R1 核心视觉客户端**（npm 包 `deepseek-vl-support`，bin 单条目 `deepseek-vl-support` 与包名同名，Node ≥18，零运行时依赖）：
   - `describe(filePath, question?) → 文本`：POST `{baseUrl}/chat/completions`，
     `image_url` data URI（base64 + mime）；`doctor`：校验 URL/端口 + `/models` 列表检查；
     `config`：查看/设置配置。

@@ -2,7 +2,9 @@
 
 ## 1. 总体架构
 
-npm 包 `deepseek-vl-support`（D6：公开发布 npm，MIT；bin 别名 `deepseek-vl`；
+npm 包 `deepseek-vl-support`（D6：公开发布 npm，MIT；bin 单一条目 `deepseek-vl-support`，
+与包名同名；0.1.0 曾用别名 `deepseek-vl`，0.1.1 起统一单同名 bin——标准发布形态；
+npx 在包目录内报 `is not recognized` 是命中本地 spec、跳过安装的运行位置问题，非 bin 别名所致；
 Node ≥18，**零运行时依赖**，devDeps 仅 typescript/esbuild/@types/node）：
 
 - 核心：视觉客户端 + 配置解析 + 图片识别 + 描述缓存（普通 TS 模块）。
@@ -13,7 +15,7 @@ Node ≥18，**零运行时依赖**，devDeps 仅 typescript/esbuild/@types/node
 
 ```
 deepseek-vl-support/
-├── package.json            name: deepseek-vl-support, bin: {deepseek-vl}, files: dist/ assets/ README.md LICENSE
+├── package.json            name: deepseek-vl-support, bin: {deepseek-vl-support}, files: dist/ assets/ README.md LICENSE
 ├── tsconfig.json
 ├── src/
 │   ├── cli.ts              # 子命令分发（手写参数解析，零依赖）
@@ -259,7 +261,10 @@ Codex 主路径：模型收到 AGENTS.md 指引 → 遇到图片任务主动调�
 
 ## 12. 发布形态（D6）
 
-- npm 包 `deepseek-vl-support`，license MIT，bin 别名 `deepseek-vl`（短命令便利）。
+- npm 包 `deepseek-vl-support`，license MIT，bin 仅单一条目 `deepseek-vl-support`（与包名
+  同名——标准发布形态，勿再添加别名；npx 冒烟须在包目录之外的独立目录执行，包目录内
+  运行会命中本地 spec、npx 跳过安装而报 `'deepseek-vl-support' is not recognized`，
+  与 bin 形态无关）。
 - `files: dist/ assets/ README.md LICENSE`——tests/、.trellis/、pi-deepseek-vision-main/、
   research 均不进包；发布前 `npm pack --dry-run` 校验内容清单（AC12）。
 - 版本规范：语义化版本，0.1.0 起；README 的 install 示例用 `@latest`，Codex config.toml

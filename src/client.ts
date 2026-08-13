@@ -157,7 +157,7 @@ export async function describe(
   if (st.size > SOFT_WARN_BYTES) {
     const warn = opts.warn ?? ((m: string) => process.stderr.write(m + "\n"));
     warn(
-      `[deepseek-vl] ${basename(abs)} is ${st.size} bytes (>2MB): remote vision API ` +
+      `[deepseek-vl-support] ${basename(abs)} is ${st.size} bytes (>2MB): remote vision API ` +
         `may be slow and costly. 图片超过 2MB，远程视觉接口可能较慢且费用较高。`,
     );
   }

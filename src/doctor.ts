@@ -37,7 +37,7 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   const lines: string[] = [];
   const baseUrl = opts.url?.trim() ? opts.url.replace(/\/+$/, "") : cfg.baseUrl;
 
-  lines.push(`[deepseek-vl] doctor 诊断`);
+  lines.push(`[deepseek-vl-support] doctor 诊断`);
   lines.push(`  baseUrl : ${baseUrl}`);
   lines.push(`  model   : ${cfg.model || "(not set 未设置)"}`);
   lines.push(`  apiKey  : ${maskApiKey(cfg.apiKey)}`);

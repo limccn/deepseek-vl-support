@@ -566,7 +566,7 @@ async function uninstallClaude(opts: UninstallOptions, report: UninstallReport, 
         log(`removed ${removed} hook entry(ies) from ${settingsFile}`);
       }
     } else {
-      log(`no deepseek-vl hook entries in ${settingsFile} 未找到本工具 hook 条目`);
+      log(`no deepseek-vl-support hook entries in ${settingsFile} 未找到本工具 hook 条目`);
     }
   } else if (existsSync(settingsFile)) {
     log(`settings.json invalid JSON — left untouched. 不是合法 JSON，未做修改: ${settingsFile}`);
@@ -648,7 +648,7 @@ async function uninstallCodex(opts: UninstallOptions, report: UninstallReport, l
       report.removed.push(`${agentsFile} (AGENTS.md block)${r2.backup ? `, backup ${r2.backup}` : ""}`);
       log(`removed AGENTS.md block from ${agentsFile}`);
     } else {
-      log(`no deepseek-vl block in ${agentsFile} 未找到标记段`);
+      log(`no deepseek-vl-support block in ${agentsFile} 未找到标记段`);
     }
   }
   report.kept.push(

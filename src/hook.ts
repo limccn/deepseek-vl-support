@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // deepseek-vl-support hook — Claude Code PreToolUse(Read) + SessionStart.
 // Bundled by esbuild into dist/hook.cjs (zero runtime deps) and copied into
 // projects by the installer. The `/*! deepseek-vl-support-hook */` banner is
@@ -22,7 +21,7 @@ process.stdin.setEncoding("utf8");
 process.stdout.setDefaultEncoding("utf8");
 
 function log(msg: string): void {
-  process.stderr.write(`[deepseek-vl] ${msg}\n`);
+  process.stderr.write(`[deepseek-vl-support] ${msg}\n`);
 }
 
 /** Write the hook JSON payload in a single write, then exit only after the
@@ -156,7 +155,7 @@ async function handleStart(input: Record<string, unknown>): Promise<void> {
     return;
   }
   const warning =
-    `[deepseek-vl] Vision not configured correctly — 视觉未正确配置\n` +
+    `[deepseek-vl-support] Vision not configured correctly — 视觉未正确配置\n` +
     problems.map((p) => `- ${p}`).join("\n") +
     `\nRun \`npx deepseek-vl-support doctor\` for details. ` +
     `Images will NOT be described automatically. 图片将不会被自动描述。`;

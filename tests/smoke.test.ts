@@ -66,7 +66,7 @@ test("version prints and exits 0", async () => {
   try {
     const r = await runCli(project, home, ["version"]);
     assert.equal(r.code, 0);
-    assert.match(r.stdout, /^deepseek-vl v\d+\.\d+\.\d+/);
+    assert.match(r.stdout, /^deepseek-vl-support v\d+\.\d+\.\d+/);
   } finally {
     await rm(base, { recursive: true, force: true });
   }

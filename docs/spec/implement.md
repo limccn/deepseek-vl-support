@@ -6,7 +6,8 @@
 
 - `git init`；`.gitignore`（node_modules/、dist/、`.deepseek-vl/`、`pi-deepseek-vision-main/`）。
 - `package.json`（name `deepseek-vl-support`、version 0.1.0、license MIT、
-  bin `{ "deepseek-vl": "dist/cli.js" }`、files: dist/ assets/ README.md LICENSE）、
+  bin `{ "deepseek-vl-support": "dist/cli.js" }`（0.1.1 起单同名 bin；0.1.0 曾用别名
+  deepseek-vl）、files: dist/ assets/ README.md LICENSE）、
   tsconfig.json、esbuild 构建脚本；`npm i -D typescript esbuild @types/node`。
 - 验证：`npx tsc --noEmit && npm run build`（先放 cli 占位文件）。
 

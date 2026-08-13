@@ -3,7 +3,7 @@
 // uninstall removes artifacts that carry them, and never touches files
 // that don't. Keep them stable across releases.
 export const PKG_NAME = "deepseek-vl-support";
-export const BIN_NAME = "deepseek-vl";
+export const BIN_NAME = "deepseek-vl-support";
 export const MCP_SERVER_NAME = "deepseek-vl";
 
 export const CONFIG_DIR = ".deepseek-vl";

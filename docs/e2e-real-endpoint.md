@@ -33,9 +33,9 @@ cat .gitignore                                  # 含 .deepseek-vl/
 ## 2. Config + doctor 配置与自检
 
 ```bash
-deepseek-vl config get          # 确认 baseUrl/model/apiKey（key 掩码显示）
-deepseek-vl doctor              # 期望 [OK] endpoint reachable + model found，退出码 0
-deepseek-vl doctor --all        # 含兜底链逐条诊断
+deepseek-vl-support config get          # 确认 baseUrl/model/apiKey（key 掩码显示）
+deepseek-vl-support doctor              # 期望 [OK] endpoint reachable + model found，退出码 0
+deepseek-vl-support doctor --all        # 含兜底链逐条诊断
 ```
 
 端点未实现 `/v1/models`（404/405）时 doctor 降级为警告不失败；网络/模型不存在则退出码 1。
@@ -43,9 +43,9 @@ deepseek-vl doctor --all        # 含兜底链逐条诊断
 ## 3. describe 单图描述（CLI）
 
 ```bash
-deepseek-vl describe some/screenshot.png
-deepseek-vl describe some/screenshot.png "What error message is shown? 报错内容是什么？"
-deepseek-vl describe --json some/screenshot.png
+deepseek-vl-support describe some/screenshot.png
+deepseek-vl-support describe some/screenshot.png "What error message is shown? 报错内容是什么？"
+deepseek-vl-support describe --json some/screenshot.png
 ```
 
 复核点：输出为详细中文+英文混合描述（可见文本/UI/颜色/报错）；问题被转发为文本部分；
@@ -54,10 +54,10 @@ deepseek-vl describe --json some/screenshot.png
 ## 4. Cache 缓存命中
 
 ```bash
-deepseek-vl describe --json some/screenshot.png   # 第一次：调 API
-deepseek-vl describe --json some/screenshot.png   # 第二次：缓存命中
+deepseek-vl-support describe --json some/screenshot.png   # 第一次：调 API
+deepseek-vl-support describe --json some/screenshot.png   # 第二次：缓存命中
 ls .deepseek-vl/cache/                            # <sha256>.json，内容即描述文本
-touch some/screenshot.png && deepseek-vl describe some/screenshot.png   # 改文件 → 重新调 API
+touch some/screenshot.png && deepseek-vl-support describe some/screenshot.png   # 改文件 → 重新调 API
 ```
 
 ## 5. Claude Code 全链路
@@ -82,16 +82,16 @@ touch some/screenshot.png && deepseek-vl describe some/screenshot.png   # 改文
 ## 7. Fallback 兜底链（可选）
 
 ```bash
-deepseek-vl config set fallbacks '{"model":"Qwen/Qwen2.5-VL-72B-Instruct","baseUrl":"https://api.siliconflow.cn/v1"}'
-deepseek-vl config set baseUrl http://127.0.0.1:1/v1   # 故意让主链路失败
-deepseek-vl describe some/screenshot.png               # 期望自动降级到兜底成功
-deepseek-vl config set baseUrl https://openrouter.ai/api/v1   # 还原
+deepseek-vl-support config set fallbacks '{"model":"Qwen/Qwen2.5-VL-72B-Instruct","baseUrl":"https://api.siliconflow.cn/v1"}'
+deepseek-vl-support config set baseUrl http://127.0.0.1:1/v1   # 故意让主链路失败
+deepseek-vl-support describe some/screenshot.png               # 期望自动降级到兜底成功
+deepseek-vl-support config set baseUrl https://openrouter.ai/api/v1   # 还原
 ```
 
 ## 8. Cleanup 收尾
 
 ```bash
-deepseek-vl uninstall --purge-config    # 移除全部产物 + 配置/缓存
+deepseek-vl-support uninstall --purge-config    # 移除全部产物 + 配置/缓存
 git status                              # 项目目录应恢复干净
 ```
 

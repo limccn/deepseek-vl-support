@@ -38,8 +38,14 @@ OpenAI 兼容的视觉端点（OpenRouter、硅基流动、百炼、Ollama、lla
 # 在目标项目目录内运行（向导交互式）
 npx deepseek-vl-support@latest install
 # 或安装到 PATH 后：
-deepseek-vl install
+deepseek-vl-support install
 ```
+
+> 两条命令等价：`npx deepseek-vl-support@latest …` 与安装后本地 `deepseek-vl-support …`
+> 指向同一个 bin（包内只提供与包名同名的单一 bin 条目 `deepseek-vl-support`）。
+> 注意：请在**包目录之外**运行 `npx deepseek-vl-support@latest …`——在包自身目录内运行
+> 时本地 package.json 会命中 spec，npx 跳过安装，cmd 报 `'deepseek-vl-support' is not
+> recognized`（属运行位置问题，与包内容无关）。
 
 向导按编号菜单逐步确认（每步都有默认值、可回车跳过）：
 
@@ -92,7 +98,7 @@ npx deepseek-vl-support install --non-interactive --dry-run --target both
 maxBytes 10MB，enabled true）。
 
 ```jsonc
-// .deepseek-vl/config.json（可由 `deepseek-vl config set <key> <value>` 修改）
+// .deepseek-vl/config.json（可由 `deepseek-vl-support config set <key> <value>` 修改）
 {
   "baseUrl": "https://openrouter.ai/api/v1",
   "model": "qwen/qwen2.5-vl-72b-instruct",
@@ -107,12 +113,12 @@ maxBytes 10MB，enabled true）。
 ```
 
 - **大图限制（maxBytes）**：默认 10MB。超过限制的图片不做描述（hook 放行 Read、提示压缩/裁剪；
-  >2MB 有软警告）。改小可省流量：`deepseek-vl config set maxBytes 5242880`。
+  >2MB 有软警告）。改小可省流量：`deepseek-vl-support config set maxBytes 5242880`。
 - **兜底模型（fallbacks）**：主模型失败（网络/HTTP/超时/空响应）按序降级；`model@baseUrl` 逗号
-  语法或 JSON 数组均可。`deepseek-vl doctor --all` 逐一诊断。
+  语法或 JSON 数组均可。`deepseek-vl-support doctor --all` 逐一诊断。
 - **关闭视觉**：`VISION_DISABLE=1` 或 `enabled:false` → hook / MCP 全部 no-op。
-- 查看/修改配置：`deepseek-vl config get [key]` / `deepseek-vl config set <key> <value>` /
-  `deepseek-vl config path`。
+- 查看/修改配置：`deepseek-vl-support config get [key]` / `deepseek-vl-support config set <key> <value>` /
+  `deepseek-vl-support config path`。
 
 ## Usage 用法
 
@@ -136,9 +142,9 @@ maxBytes 10MB，enabled true）。
 ## Uninstall 卸载
 
 ```bash
-deepseek-vl uninstall            # 移除 hook/技能/命令/MCP 注册，保留配置与缓存
-deepseek-vl uninstall --purge-config   # 连 .deepseek-vl/（配置+缓存）与 .gitignore 条目一起删除
-deepseek-vl uninstall --global --target codex
+deepseek-vl-support uninstall            # 移除 hook/技能/命令/MCP 注册，保留配置与缓存
+deepseek-vl-support uninstall --purge-config   # 连 .deepseek-vl/（配置+缓存）与 .gitignore 条目一起删除
+deepseek-vl-support uninstall --global --target codex
 ```
 
 只删除带本工具标记的文件；用户自写文件（无标记）一律跳过并提示。所有修改前先备份 `.bak`。
@@ -155,7 +161,7 @@ deepseek-vl uninstall --global --target codex
 - **Codex 首次调用 MCP 工具需批准**：交互会话首次调用 `mcp__deepseek-vl__*` 会弹批准提示，
   点一次 Allow 即可（codex 对所有 MCP server 的标准行为，非本工具特有）；非交互
   `codex exec`（approval_policy=never）下 MCP 调用会被自动取消（"user cancelled MCP tool
-  call"），该场景请改用 CLI 命令 `deepseek-vl describe <file>`。
+  call"），该场景请改用 CLI 命令 `deepseek-vl-support describe <file>`。
 - **推理模型不可用**：DeepSeek v4-r1 / reasoning 模型不支持函数调用（tool use）。Codex 配置需
   `[model_providers.deepseek] wire_api = "chat"` 并使用非推理模型；视觉侧也建议用非推理视觉模型。
 - **粘贴图片的局限**：Claude Code 里 Ctrl+V 粘贴的图片走编辑/粘贴通道，不走 Read hook，无法自动
@@ -164,7 +170,7 @@ deepseek-vl uninstall --global --target codex
   图片只看到占位文案 `[Unsupported Image]`（不会崩溃），且通常会主动发现并建议调用
   `deepseek-vision` skill——按提示操作即可。
 - **图片过大**：超过 maxBytes 被跳过——先压缩/裁剪（如 5MB 以内、长边约 2000px）。
-- **端点不可达**：`deepseek-vl doctor` 输出详细诊断；确认 base URL 以 `/v1` 结尾、模型 id 与
+- **端点不可达**：`deepseek-vl-support doctor` 输出详细诊断；确认 base URL 以 `/v1` 结尾、模型 id 与
   `/v1/models` 列表一致（ollama 可用 `./qwen2.5vl:7b` 形式，内部已归一化比较）。
 
 ## Development 开发
