@@ -1,0 +1,10 @@
+node_modules/
+dist/
+assets/
+.deepseek-vl/
+*.log
+
+.agents/
+.claude/
+.codex/
+.cache/

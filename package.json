@@ -1,0 +1,38 @@
+{
+  "name": "deepseek-vl-support",
+  "version": "0.1.0",
+  "description": "Give DeepSeek (text-only) models vision in Claude Code & Codex: describe images via any OpenAI-compatible vision endpoint. | 为使用 DeepSeek 纯文本模型的 Claude Code / Codex 提供图片描述能力",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "deepseek-vl": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "assets/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "deepseek",
+    "vision",
+    "claude-code",
+    "codex",
+    "mcp",
+    "image-description"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/*.test.ts\"",
+    "verify": "npm run build && npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
