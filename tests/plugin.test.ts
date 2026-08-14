@@ -1,12 +1,14 @@
 // Agent Plugins mode tests: static spec compliance of the portable package
 // (plugin.json / mcp.json / .mcp.json / marketplace.json / skills/SKILL.md),
 // materialized plugin dir, and per-client registration/unregistration for
-// GitHub Copilot, Cursor, Kiro, OpenClaw, and Hermes against mocked CLIs on
-// PATH. Also covers the copilot settings.json fallback, dry-run (no writes,
-// no commands), failure isolation, and uninstall marker rules.
+// all 10 clients — GitHub Copilot, Cursor, Kiro, OpenClaw, Hermes Agent,
+// VS Code, ChatGPT & Codex, Grok Bot, NanoClaw, and generic "other" —
+// against mocked CLIs on PATH. Also covers the copilot/VS Code settings.json
+// fallbacks, the codex marketplace shim, dry-run (no writes, no commands),
+// failure isolation, and uninstall marker rules.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -16,10 +18,13 @@ import {
   detectPluginClients,
   materializePluginDir,
   pluginDir,
+  PLUGIN_CLIENTS,
+  vscodeUserSettingsPath,
 } from "../src/plugin.ts";
 import {
   CURSOR_PLUGIN_DIRNAME,
   CURSOR_PLUGIN_MARKER_FILE,
+  HOOK_FILENAME,
   PLUGIN_REPO,
 } from "../src/identity.ts";
 import { startMockVisionServer } from "./mock-vision-server.ts";
@@ -49,7 +54,7 @@ async function makeEnv(): Promise<{ base: string; project: string; home: string 
 
 beforeEach(() => {
   for (const k of Object.keys(process.env)) {
-    if (k.startsWith("VISION_") || k.startsWith("DVLS_")) delete process.env[k];
+    if (k.startsWith("VISION_") || k.startsWith("DVLS_") || k === "NANOCLAW_TEMPLATES_DIR") delete process.env[k];
   }
 });
 
@@ -240,7 +245,7 @@ async function makeMockClients(base: string): Promise<MockClients> {
   mkdirSync(binDir, { recursive: true });
   mkdirSync(stateDir, { recursive: true });
   await writeFile(join(binDir, "mock-cli.js"), MOCK_CLI_JS, "utf8");
-  for (const name of ["copilot", "openclaw", "hermes"]) {
+  for (const name of ["copilot", "openclaw", "hermes", "codex", "grok", "ncl", "code"]) {
     if (process.platform === "win32") {
       await writeFile(join(binDir, `${name}.cmd`), `@node "%~dp0mock-cli.js" ${name} %*\r\n`, "utf8");
     } else {
@@ -273,7 +278,7 @@ async function pluginInstall(opts: Record<string, unknown> = {}) {
       cwd: project,
       home,
       nonInteractive: true,
-      target: "plugin",
+      targets: [...PLUGIN_CLIENTS],
       baseUrl: mock.url,
       model: "qwen2.5vl:7b",
       ...opts,
@@ -318,14 +323,26 @@ test("install plugin: materializes, writes global config, and registers all clie
     assert.ok(calls.some((c) => c[0] === "openclaw" && c[1] === "gateway" && c[2] === "restart"));
     assert.ok(calls.some((c) => c[0] === "hermes" && c[1] === "plugins" && c[2] === "install" && c[3] === "limccn/deepseek-vl-support" && c[4] === "--no-enable"));
     assert.ok(calls.some((c) => c[0] === "hermes" && c[1] === "plugins" && c[2] === "enable" && c[3] === "deepseek-vl-support"));
+    // new clients
+    assert.ok(calls.some((c) => c[0] === "codex" && c[1] === "plugin" && c[2] === "marketplace" && c[3] === "add"), `codex marketplace add: ${JSON.stringify(calls)}`);
+    assert.ok(calls.some((c) => c[0] === "codex" && c[1] === "plugin" && c[2] === "add" && c[3] === "deepseek-vl-support@deepseek-vl-support"));
+    assert.ok(calls.some((c) => c[0] === "grok" && c[1] === "plugin" && c[2] === "install" && c[3] === dest && c[4] === "--trust"), `grok install: ${JSON.stringify(calls)}`);
+    assert.ok(calls.some((c) => c[0] === "ncl" && c[1] === "groups" && c[2] === "create" && c[3] === "--template" && c[4] === "deepseek-vl-support"));
+    assert.ok(existsSync(vscodeUserSettingsPath(home)), "vscode user settings written (code CLI detected)");
+    assert.ok(existsSync(join(home, ".deepseek-vl", "marketplace", ".agents", "plugins", "marketplace.json")), "codex marketplace shim written");
 
     // per-client report
-    const byClient = new Map(report.pluginClients?.map((r) => [r.client, r.status]));
+    const byClient = new Map(report.agents?.map((r) => [r.agent, r.status]));
     assert.equal(byClient.get("copilot"), "ok");
     assert.equal(byClient.get("cursor"), "ok");
     assert.equal(byClient.get("openclaw"), "ok");
     assert.equal(byClient.get("hermes"), "ok");
     assert.equal(byClient.get("kiro"), "manual", "kiro always prints manual instructions");
+    assert.equal(byClient.get("vscode"), "ok");
+    assert.equal(byClient.get("chatgpt-codex"), "ok");
+    assert.equal(byClient.get("grok"), "ok");
+    assert.equal(byClient.get("nanoclaw"), "ok");
+    assert.equal(byClient.get("other"), "manual", "other always prints generic guidance");
     assert.equal(report.doctor?.ok, true, "doctor self-check still runs and passes");
   } finally {
     await rm(base, { recursive: true, force: true });
@@ -347,7 +364,7 @@ test("install plugin: copilot settings.json fallback when the CLI is missing (ma
     const settings = readJson(settingsFile);
     const enabled = settings.enabledPlugins as string[];
     assert.deepEqual(enabled, [PLUGIN_REPO]);
-    assert.equal(report.pluginClients?.find((r) => r.client === "copilot")?.status, "ok");
+    assert.equal(report.agents?.find((r) => r.agent === "copilot")?.status, "ok");
 
     // user adds another plugin; re-install is idempotent and preserves it
     (settings.enabledPlugins as string[]).push("some/other-plugin");
@@ -356,7 +373,7 @@ test("install plugin: copilot settings.json fallback when the CLI is missing (ma
       cwd: join(base, "project2"),
       home,
       nonInteractive: true,
-      target: "plugin",
+      targets: ["copilot"],
       clients: ["copilot"],
       baseUrl: "http://127.0.0.1:1/v1",
       model: "qwen2.5vl:7b",
@@ -366,9 +383,9 @@ test("install plugin: copilot settings.json fallback when the CLI is missing (ma
     assert.ok(again.output.some((l) => l.includes("idempotent")));
 
     // uninstall removes only our entry
-    const un = await runUninstall({ cwd: join(base, "project2"), home, target: "plugin", clients: ["copilot"] });
+    const un = await runUninstall({ cwd: join(base, "project2"), home, targets: ["copilot"], clients: ["copilot"] });
     assert.deepEqual(readJson(settingsFile).enabledPlugins, ["some/other-plugin"]);
-    assert.ok(un.pluginClients?.find((r) => r.client === "copilot")?.status === "ok");
+    assert.ok(un.agents?.find((r) => r.agent === "copilot")?.status === "ok");
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -381,12 +398,12 @@ test("install plugin: failure isolation — one failing client does not block th
     putClientsOnPath(mock, false, "copilot:plugin install");
     const { report, home } = await pluginInstall();
 
-    const byClient = new Map(report.pluginClients?.map((r) => [r.client, r.status]));
+    const byClient = new Map(report.agents?.map((r) => [r.agent, r.status]));
     assert.equal(byClient.get("copilot"), "failed");
     assert.equal(byClient.get("openclaw"), "ok", "openclaw unaffected by copilot failure");
     assert.equal(byClient.get("hermes"), "ok");
     assert.equal(byClient.get("cursor"), "ok");
-    assert.ok(report.warnings.some((w) => w.includes("1 client(s) failed")), "summary warning present");
+    assert.ok(report.warnings.some((w) => w.includes("1 agent(s) failed")), "summary warning present");
     assert.ok(existsSync(join(home, ".cursor", "plugins", "local", CURSOR_PLUGIN_DIRNAME, "plugin.json")));
     assert.ok(existsSync(pluginDir(home)), "materialized dir exists regardless of client failures");
   } finally {
@@ -407,14 +424,35 @@ test("install plugin: --clients filters, dry-run executes nothing and writes not
     assert.ok(!existsSync(join(home, ".cursor", "plugins", "local", CURSOR_PLUGIN_DIRNAME)));
     assert.equal(mock.callsLog().length, 0, "no external commands executed in dry-run");
 
-    // report still lists every client, filtered to the requested ones
-    const byClient = new Map(report.pluginClients?.map((r) => [r.client, r.status]));
+    // report lists ONLY the effective plugin agents (targets ∩ --clients);
+    // the old "skipped: not requested" entries are gone
+    assert.equal(report.agents?.length, 2, `expected only cursor+hermes, got: ${JSON.stringify(report.agents)}`);
+    const byClient = new Map(report.agents?.map((r) => [r.agent, r.status]));
     assert.equal(byClient.get("cursor"), "ok");
     assert.equal(byClient.get("hermes"), "ok");
-    assert.equal(byClient.get("copilot"), "skipped", "not requested (--clients)");
-    assert.equal(byClient.get("openclaw"), "skipped");
-    assert.equal(byClient.get("kiro"), "skipped");
+    assert.equal(byClient.get("copilot"), undefined, "copilot not in targets ∩ --clients");
+    assert.equal(byClient.get("openclaw"), undefined);
+    assert.equal(byClient.get("kiro"), undefined);
     assert.ok(report.output.some((l) => l.includes("[dry-run]")));
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("--clients with an empty intersection warns and registers nothing (still materializes)", async () => {
+  const { base } = await makeEnv();
+  try {
+    const mock = await makeMockClients(base);
+    putClientsOnPath(mock);
+    const { report, home } = await pluginInstall({ targets: ["copilot"], clients: ["cursor", "hermes"] });
+
+    assert.ok(
+      report.warnings.some((w) => w.includes("does not intersect")),
+      `expected intersection warning, got: ${report.warnings.join("|")}`,
+    );
+    assert.equal(report.agents?.length, 0, "no per-agent results when targets ∩ clients is empty");
+    assert.equal(mock.callsLog().length, 0, "no external commands executed");
+    assert.ok(existsSync(pluginDir(home)), "materialized dir still refreshed (shared state for manual use)");
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -440,26 +478,354 @@ test("install plugin: second run is idempotent — already-installed clients onl
   }
 });
 
+test("detection: codex/grok/ncl/code CLI probes, vscode settings-dir probe, other has no detector", async () => {
+  const { base, home } = await makeEnv();
+  try {
+    const env = { PATH: "" };
+    let det = detectPluginClients(home, env);
+    assert.equal(det["chatgpt-codex"].detected, false, "codex not on PATH");
+    assert.equal(det.grok.detected, false);
+    assert.equal(det.nanoclaw.detected, false);
+    assert.equal(det.vscode.detected, false, "no code CLI and no settings dir");
+    assert.equal(det.other.detected, false);
+    assert.equal(det.other.reason, "no detection surface — guidance only");
+
+    // vscode detected via a user settings dir even without the code CLI
+    const userDir = join(vscodeUserSettingsPath(home), "..");
+    mkdirSync(userDir, { recursive: true });
+    det = detectPluginClients(home, env);
+    assert.equal(det.vscode.detected, true, "vscode via user settings dir");
+
+    // CLI probes for codex/grok/ncl
+    const binDir = join(base, "bin");
+    mkdirSync(binDir, { recursive: true });
+    const ext = process.platform === "win32" ? ".cmd" : "";
+    await writeFile(join(binDir, `codex${ext}`), "@echo off\n", "utf8");
+    await writeFile(join(binDir, `grok${ext}`), "@echo off\n", "utf8");
+    await writeFile(join(binDir, `ncl${ext}`), "@echo off\n", "utf8");
+    det = detectPluginClients(home, { PATH: binDir });
+    assert.equal(det["chatgpt-codex"].detected, true);
+    assert.equal(det["chatgpt-codex"].bin, join(binDir, `codex${ext}`));
+    assert.equal(det.grok.detected, true);
+    assert.equal(det.nanoclaw.detected, true);
+    assert.equal(det.other.detected, false, "other never has a detector");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("vscode: settings.json chat.pluginLocations write (.bak backup), idempotent re-install, uninstall removes only our entry", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const mockClients = await makeMockClients(base);
+      putClientsOnPath(mockClients);
+      // pre-seed a user settings.json with a foreign plugin location so the
+      // first install takes the modify-existing path (backup + merge)
+      const settingsFile = vscodeUserSettingsPath(home);
+      mkdirSync(join(settingsFile, ".."), { recursive: true });
+      writeFileSync(settingsFile, JSON.stringify({ chat: { pluginLocations: { "/user/plugin": true } } }, null, 2) + "\n", "utf8");
+
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["vscode"], clients: ["vscode"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      assert.ok(existsSync(`${settingsFile}.bak`), "backup created on the first modification");
+      let locs = ((readJson(settingsFile).chat as Record<string, unknown>).pluginLocations as Record<string, boolean>);
+      assert.equal(locs[pluginDir(home)], true, "our plugin dir registered");
+      assert.equal(locs["/user/plugin"], true, "user entry preserved");
+      assert.equal(report.agents?.find((r) => r.agent === "vscode")?.status, "ok");
+
+      // re-install is idempotent and keeps the user entry
+      const again = await runInstall({ cwd: join(base, "project2"), home, nonInteractive: true, targets: ["vscode"], clients: ["vscode"], baseUrl: "http://127.0.0.1:1/v1", model: "qwen2.5vl:7b" });
+      assert.ok(again.output.some((l) => l.includes("idempotent")), `expected idempotent log: ${again.output.join("|")}`);
+      const after = ((readJson(settingsFile).chat as Record<string, unknown>).pluginLocations as Record<string, boolean>);
+      assert.equal(after[pluginDir(home)], true);
+      assert.equal(after["/user/plugin"], true);
+
+      // uninstall removes only our entry; .bak holds the pre-uninstall state
+      const un = await runUninstall({ cwd: join(base, "project2"), home, targets: ["vscode"], clients: ["vscode"] });
+      assert.equal(un.agents?.find((r) => r.agent === "vscode")?.status, "ok");
+      const afterUn = ((readJson(settingsFile).chat as Record<string, unknown>).pluginLocations as Record<string, boolean>);
+      assert.equal(afterUn[pluginDir(home)], undefined, "our entry removed");
+      assert.equal(afterUn["/user/plugin"], true, "user entry kept");
+      assert.ok(existsSync(`${settingsFile}.bak`), "uninstall also backs up before writing");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("chatgpt-codex: local marketplace shim OUTSIDE the materialized dir; codex CLI sequence; uninstall removes the plugin", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const mockClients = await makeMockClients(base);
+      putClientsOnPath(mockClients);
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["chatgpt-codex"], clients: ["chatgpt-codex"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+
+      // the materialized dir keeps exactly its 4 spec entries — no codex
+      // marketplace manifest may leak into it (PRD REQ-4 invariant)
+      const dest = pluginDir(home);
+      assert.deepEqual(readdirSync(dest).sort(), [".mcp.json", "mcp.json", "plugin.json", "skills"]);
+      assert.ok(!existsSync(join(dest, ".agents")), "no codex manifest inside the materialized dir");
+
+      // the shim lives OUTSIDE the materialized dir
+      const shimManifest = join(home, ".deepseek-vl", "marketplace", ".agents", "plugins", "marketplace.json");
+      assert.ok(existsSync(shimManifest), "codex marketplace shim written");
+      const mkt = readJson(shimManifest);
+      assert.equal(mkt.name, "deepseek-vl-support");
+      assert.equal((mkt.owner as Record<string, unknown>).name, "limccn");
+      const entry = (mkt.plugins as Array<Record<string, unknown>>)[0];
+      assert.equal(entry.name, "deepseek-vl-support");
+      assert.deepEqual(entry.source, { source: "local", path: "./plugin" });
+      assert.deepEqual(entry.policy, { installation: "AVAILABLE", authentication: "ON_INSTALL" });
+      assert.equal(entry.category, "development");
+      assert.ok(existsSync(join(home, ".deepseek-vl", "marketplace", "plugin", "plugin.json")), "shim carries a plugin copy");
+      assert.ok(existsSync(join(home, ".deepseek-vl", "marketplace", "plugin", "skills", "deepseek-vision", "SKILL.md")));
+
+      const calls = mockClients.callsLog();
+      assert.ok(calls.some((c) => c[0] === "codex" && c[1] === "plugin" && c[2] === "list"));
+      assert.ok(calls.some((c) => c[0] === "codex" && c[1] === "plugin" && c[2] === "marketplace" && c[3] === "add" && c[4] === join(home, ".deepseek-vl", "marketplace")), `expected marketplace add: ${JSON.stringify(calls)}`);
+      assert.ok(calls.some((c) => c[0] === "codex" && c[1] === "plugin" && c[2] === "add" && c[3] === "deepseek-vl-support@deepseek-vl-support"));
+      assert.equal(report.agents?.find((r) => r.agent === "chatgpt-codex")?.status, "ok");
+
+      // uninstall: codex plugin remove; the marketplace registration stays
+      const un = await runUninstall({ cwd: project, home, targets: ["chatgpt-codex"], clients: ["chatgpt-codex"] });
+      assert.ok(mockClients.callsLog().some((c) => c[0] === "codex" && c[1] === "plugin" && c[2] === "remove" && c[3] === "deepseek-vl-support@deepseek-vl-support"));
+      assert.ok(existsSync(shimManifest), "marketplace shim kept on uninstall");
+      assert.equal(un.agents?.find((r) => r.agent === "chatgpt-codex")?.status, "ok");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("chatgpt-codex: manual guidance when the codex CLI is missing (no commands run)", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const mockClients = await makeMockClients(base);
+      await rm(join(mockClients.binDir, process.platform === "win32" ? "codex.cmd" : "codex"), { force: true });
+      process.env.PATH = mockClients.binDir;
+      process.env.DVLS_MOCK_STATE_DIR = mockClients.stateDir;
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["chatgpt-codex"], clients: ["chatgpt-codex"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      const r = report.agents?.find((a) => a.agent === "chatgpt-codex");
+      assert.equal(r?.status, "manual");
+      assert.match(r?.detail ?? "", /codex CLI not found/);
+      assert.equal(mockClients.callsLog().length, 0, "no commands run without the CLI");
+      assert.ok(existsSync(join(pluginDir(home), "plugin.json")), "materialized dir still written for manual installs");
+      // the marketplace shim is written even without the CLI so the manual
+      // ChatGPT-desktop instructions (which point at shimRoot) are actionable
+      assert.ok(
+        existsSync(join(home, ".deepseek-vl", "marketplace", ".agents", "plugins", "marketplace.json")),
+        "marketplace shim written for the manual install path",
+      );
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("grok: plugin install --trust via CLI; uninstall --confirm", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const mockClients = await makeMockClients(base);
+      putClientsOnPath(mockClients);
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["grok"], clients: ["grok"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      const dest = pluginDir(home);
+      const calls = mockClients.callsLog();
+      assert.ok(calls.some((c) => c[0] === "grok" && c[1] === "plugin" && c[2] === "list"));
+      assert.ok(calls.some((c) => c[0] === "grok" && c[1] === "plugin" && c[2] === "install" && c[3] === dest && c[4] === "--trust"), `expected grok install: ${JSON.stringify(calls)}`);
+      assert.equal(report.agents?.find((r) => r.agent === "grok")?.status, "ok");
+
+      const un = await runUninstall({ cwd: project, home, targets: ["grok"], clients: ["grok"] });
+      assert.ok(mockClients.callsLog().some((c) => c[0] === "grok" && c[1] === "plugin" && c[2] === "uninstall" && c[3] === "deepseek-vl-support" && c[4] === "--confirm"), `expected grok uninstall: ${JSON.stringify(mockClients.callsLog())}`);
+      assert.equal(un.agents?.find((r) => r.agent === "grok")?.status, "ok");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("grok: manual guidance with the .mcp.json convention note when the CLI is missing", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const mockClients = await makeMockClients(base);
+      await rm(join(mockClients.binDir, process.platform === "win32" ? "grok.cmd" : "grok"), { force: true });
+      process.env.PATH = mockClients.binDir;
+      process.env.DVLS_MOCK_STATE_DIR = mockClients.stateDir;
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["grok"], clients: ["grok"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      const r = report.agents?.find((a) => a.agent === "grok");
+      assert.equal(r?.status, "manual");
+      assert.match(r?.detail ?? "", /\.mcp\.json/, "guidance mentions the dot-prefixed MCP convention");
+      assert.match(r?.detail ?? "", /grok plugin install/);
+      assert.equal(mockClients.callsLog().length, 0, "no commands run without the CLI");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("nanoclaw: template copy (never a symlink) + ncl groups create; uninstall = manual guidance", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const mockClients = await makeMockClients(base);
+      putClientsOnPath(mockClients);
+      delete process.env.NANOCLAW_TEMPLATES_DIR;
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["nanoclaw"], clients: ["nanoclaw"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+
+      const templateDest = join(home, ".deepseek-vl", "nanoclaw-templates", "deepseek-vl-support");
+      assert.ok(existsSync(join(templateDest, "plugin.json")), "template copy written");
+      assert.ok(existsSync(join(templateDest, "skills", "deepseek-vision", "SKILL.md")));
+      const calls = mockClients.callsLog();
+      assert.ok(calls.some((c) => c[0] === "ncl" && c[1] === "groups" && c[2] === "create" && c[3] === "--template" && c[4] === "deepseek-vl-support" && c[5] === "--name" && c[6] === "DeepSeek Vision"), `expected ncl groups create: ${JSON.stringify(calls)}`);
+      const nanoclawResult = report.agents?.find((r) => r.agent === "nanoclaw");
+      assert.equal(nanoclawResult?.status, "ok");
+      assert.match(nanoclawResult?.detail ?? "", /NANOCLAW_TEMPLATES_DIR/, "detail points at the templates dir env");
+
+      // uninstall = manual guidance (NanoClaw has no plugin uninstall)
+      const un = await runUninstall({ cwd: project, home, targets: ["nanoclaw"], clients: ["nanoclaw"] });
+      assert.equal(un.agents?.find((r) => r.agent === "nanoclaw")?.status, "manual");
+      assert.ok(existsSync(templateDest), "template copy kept");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("nanoclaw: manual guidance when the ncl CLI is missing", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const mockClients = await makeMockClients(base);
+      await rm(join(mockClients.binDir, process.platform === "win32" ? "ncl.cmd" : "ncl"), { force: true });
+      process.env.PATH = mockClients.binDir;
+      process.env.DVLS_MOCK_STATE_DIR = mockClients.stateDir;
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["nanoclaw"], clients: ["nanoclaw"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      const r = report.agents?.find((a) => a.agent === "nanoclaw");
+      assert.equal(r?.status, "manual");
+      assert.match(r?.detail ?? "", /ncl CLI not found/);
+      assert.equal(mockClients.callsLog().length, 0, "no commands run without the CLI");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("other: materialize only + guidance; uninstall reports guidance only and keeps the dir", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["other"], clients: ["other"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      assert.ok(existsSync(join(pluginDir(home), "plugin.json")), "materialized for manual installs");
+      const r = report.agents?.find((a) => a.agent === "other");
+      assert.equal(r?.status, "manual");
+      assert.match(r?.detail ?? "", /agent-plugins\.org\/specification/, "guidance points at the open standard");
+      assert.match(r?.detail ?? "", /deepseek-vision/, "guidance mentions the skill name");
+
+      const un = await runUninstall({ cwd: project, home, targets: ["other"], clients: ["other"] });
+      const ur = un.agents?.find((a) => a.agent === "other");
+      assert.equal(ur?.status, "manual");
+      assert.ok(existsSync(pluginDir(home)), "materialized dir kept without --purge-config");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("install plugin: failure isolation — a failing new client (grok) does not block the others", async () => {
+  const { base } = await makeEnv();
+  try {
+    const mock = await makeMockClients(base);
+    putClientsOnPath(mock, false, "grok:plugin install");
+    const { report, home } = await pluginInstall();
+    const byClient = new Map(report.agents?.map((r) => [r.agent, r.status]));
+    assert.equal(byClient.get("grok"), "failed");
+    assert.equal(byClient.get("vscode"), "ok", "vscode unaffected by grok failure");
+    assert.equal(byClient.get("chatgpt-codex"), "ok");
+    assert.equal(byClient.get("nanoclaw"), "ok");
+    assert.equal(byClient.get("copilot"), "ok");
+    assert.ok(report.warnings.some((w) => w.includes("agent(s) failed")), "summary warning present");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("install plugin: dry-run for the new clients runs no commands and writes nothing", async () => {
+  const { base } = await makeEnv();
+  try {
+    const mock = await makeMockClients(base);
+    putClientsOnPath(mock);
+    const { report, home } = await pluginInstall({
+      clients: ["vscode", "grok", "chatgpt-codex", "nanoclaw", "other"],
+      dryRun: true,
+    });
+    assert.ok(!existsSync(vscodeUserSettingsPath(home)), "no vscode settings write in dry-run");
+    assert.ok(!existsSync(join(home, ".deepseek-vl")), "no marketplace shim / materialize in dry-run");
+    assert.equal(mock.callsLog().length, 0, "no external commands executed");
+    const byClient = new Map(report.agents?.map((r) => [r.agent, r.status]));
+    assert.equal(byClient.get("vscode"), "ok", "dry-run reports vscode ok");
+    assert.equal(byClient.get("grok"), "ok");
+    assert.equal(byClient.get("chatgpt-codex"), "ok");
+    assert.equal(byClient.get("nanoclaw"), "ok");
+    assert.equal(byClient.get("other"), "manual", "other is guidance-only even in dry-run");
+    assert.ok(report.output.some((l) => l.includes("[dry-run]")));
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
 test("uninstall plugin: unregisters clients, removes the marked cursor dir, keeps materialized dir", async () => {
   const { base } = await makeEnv();
   try {
     const mock = await makeMockClients(base);
     putClientsOnPath(mock);
     const { report, project, home } = await pluginInstall();
-    assert.ok(report.pluginClients, "install report has per-client results");
+    assert.ok(report.agents, "install report has per-agent results");
 
-    const un = await runUninstall({ cwd: project, home, target: "plugin" });
+    const un = await runUninstall({ cwd: project, home, targets: [...PLUGIN_CLIENTS] });
     const calls = mock.callsLog();
     assert.ok(calls.some((c) => c[0] === "copilot" && c[1] === "plugin" && c[2] === "uninstall" && c[3] === "deepseek-vl-support"));
     assert.ok(calls.some((c) => c[0] === "openclaw" && c[1] === "plugins" && c[2] === "uninstall" && c[3] === "deepseek-vl-support"));
     assert.ok(calls.some((c) => c[0] === "hermes" && c[1] === "plugins" && c[2] === "uninstall" && c[3] === "deepseek-vl-support"));
+    assert.ok(calls.some((c) => c[0] === "grok" && c[1] === "plugin" && c[2] === "uninstall" && c[3] === "deepseek-vl-support" && c[4] === "--confirm"), `grok uninstall: ${JSON.stringify(calls)}`);
+    assert.ok(calls.some((c) => c[0] === "codex" && c[1] === "plugin" && c[2] === "remove" && c[3] === "deepseek-vl-support@deepseek-vl-support"), `codex remove: ${JSON.stringify(calls)}`);
     assert.ok(!existsSync(join(home, ".cursor", "plugins", "local", CURSOR_PLUGIN_DIRNAME)), "cursor dir removed");
+    // vscode: our settings entry removed, file rewritten without it
+    const settings = readJson(vscodeUserSettingsPath(home));
+    const locs = ((settings.chat as Record<string, unknown> | undefined)?.pluginLocations ?? {}) as Record<string, unknown>;
+    assert.ok(!Object.keys(locs).some((k) => k.includes(".deepseek-vl")), "vscode entry removed on uninstall");
     assert.ok(existsSync(pluginDir(home)), "materialized dir kept without --purge-config");
     assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")), "config kept");
     assert.ok(un.kept.some((k) => k.includes("materialized plugin dir kept")));
 
     // second uninstall is a no-op
-    const again = await runUninstall({ cwd: project, home, target: "plugin" });
+    const again = await runUninstall({ cwd: project, home, targets: [...PLUGIN_CLIENTS] });
     assert.equal(again.removed.length, 0);
   } finally {
     await rm(base, { recursive: true, force: true });
@@ -472,7 +838,7 @@ test("uninstall plugin: --purge-config removes the materialized dir; user-author
     const mock = await makeMockClients(base);
     putClientsOnPath(mock);
     const { report, project, home } = await pluginInstall();
-    assert.ok(report.pluginClients);
+    assert.ok(report.agents);
 
     // user-authored cursor dir without our marker must survive uninstall
     const userDir = join(home, ".cursor", "plugins", "local", CURSOR_PLUGIN_DIRNAME);
@@ -480,9 +846,9 @@ test("uninstall plugin: --purge-config removes the materialized dir; user-author
     mkdirSync(userDir, { recursive: true });
     writeFileSync(join(userDir, "plugin.json"), "{\"name\":\"user-plugin\"}\n", "utf8");
 
-    const un = await runUninstall({ cwd: project, home, target: "plugin", purgeConfig: true });
+    const un = await runUninstall({ cwd: project, home, targets: [...PLUGIN_CLIENTS], purgeConfig: true });
     assert.ok(existsSync(join(userDir, "plugin.json")), "user-authored cursor dir kept");
-    const cursorResult = un.pluginClients?.find((r) => r.client === "cursor");
+    const cursorResult = un.agents?.find((r) => r.agent === "cursor");
     assert.equal(cursorResult?.status, "skipped");
     assert.ok(un.output.some((l) => l.includes("user-authored")), `expected skip log, got: ${un.output.join("|")}`);
     assert.ok(!existsSync(join(home, ".deepseek-vl")), "--purge-config removes config + materialized dir");
@@ -500,14 +866,63 @@ test("uninstall plugin: copilot settings fallback entry removed only when marked
     process.env.PATH = mock.binDir; // no copilot CLI
     process.env.DVLS_MOCK_STATE_DIR = mock.stateDir;
     const { report, project, home } = await pluginInstall({ clients: ["copilot"] });
-    assert.ok(report.pluginClients);
+    assert.ok(report.agents);
 
-    const un = await runUninstall({ cwd: project, home, target: "plugin", clients: ["copilot"] });
+    const un = await runUninstall({ cwd: project, home, targets: ["copilot"], clients: ["copilot"] });
     const settingsFile = join(home, ".copilot", "settings.json");
     const settings = readJson(settingsFile) as { enabledPlugins?: string[] };
     assert.ok(!settings.enabledPlugins || settings.enabledPlugins.length === 0, "our entry removed");
-    assert.equal(un.pluginClients?.find((r) => r.client === "copilot")?.status, "ok");
+    assert.equal(un.agents?.find((r) => r.agent === "copilot")?.status, "ok");
   } finally {
     await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("mixed run: claude + copilot in ONE install (native artifacts + plugin registration); uninstall reverses", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    const mockClients = await makeMockClients(base);
+    putClientsOnPath(mockClients);
+    try {
+      mkdirSync(join(home, ".cursor"), { recursive: true });
+      const report = await runInstall({
+        cwd: project,
+        home,
+        nonInteractive: true,
+        targets: ["claude", "copilot"],
+        baseUrl: mock.url,
+        model: "qwen2.5vl:7b",
+      });
+
+      // claude native artifacts (project scope — no --global passed)
+      assert.ok(existsSync(join(project, ".claude", "hooks", HOOK_FILENAME)));
+
+      // copilot registered through the mocked CLI (plugin install command)
+      const calls = mockClients.callsLog();
+      assert.ok(calls.some((c) => c[0] === "copilot" && c[1] === "plugin" && c[2] === "install"), `expected copilot install call: ${JSON.stringify(calls)}`);
+
+      // endpoint config is global whenever any plugin agent is selected
+      assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")));
+      assert.ok(!existsSync(join(project, ".deepseek-vl")), "no project config in a mixed run");
+
+      // unified per-agent report shape: claude and copilot side by side
+      assert.equal(report.agents?.length, 2);
+      assert.equal(report.agents!.find((a) => a.agent === "claude")?.status, "ok");
+      assert.equal(report.agents!.find((a) => a.agent === "copilot")?.status, "ok");
+      assert.ok(report.output.some((l) => l.startsWith("[claude] ok")), `per-agent line missing: ${report.output.join("|")}`);
+      assert.ok(report.output.some((l) => l.startsWith("[copilot] ok")), `per-agent line missing: ${report.output.join("|")}`);
+
+      // uninstall reverses both in one run
+      const un = await runUninstall({ cwd: project, home, targets: ["claude", "copilot"] });
+      assert.ok(!existsSync(join(project, ".claude", "hooks", HOOK_FILENAME)));
+      assert.ok(un.agents!.some((a) => a.agent === "claude" && a.status === "ok"));
+      assert.ok(un.agents!.some((a) => a.agent === "copilot" && a.status === "ok"));
+      assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")), "config kept without --purge-config");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
   }
 });

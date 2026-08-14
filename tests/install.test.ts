@@ -10,7 +10,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { runInstall, runUninstall } from "../src/install.ts";
+import { agentMenuSpec, parseTargets, runInstall, runUninstall } from "../src/install.ts";
+import { AGENTS, detectPluginClients, PLUGIN_CLIENT_LABELS, PLUGIN_CLIENTS } from "../src/plugin.ts";
 import {
   AGENTS_END_MARKER,
   AGENTS_START_MARKER,
@@ -66,7 +67,7 @@ async function installBoth(project: string, home: string, mockUrl: string, extra
     cwd: project,
     home,
     nonInteractive: true,
-    target: "both",
+    targets: ["claude", "codex"],
     baseUrl: mockUrl,
     model: "qwen2.5vl:7b",
     apiKey: "",
@@ -208,7 +209,7 @@ test("global scope: settings under ~/.claude with JSON-escaped absolute hook com
         cwd: project,
         home,
         nonInteractive: true,
-        target: "claude",
+        targets: ["claude"],
         global: true,
         baseUrl: mock.url,
         model: "qwen2.5vl:7b",
@@ -270,7 +271,7 @@ test("codex install: MCP section + AGENTS.md block + models.json fix, preserving
         cwd: project,
         home,
         nonInteractive: true,
-        target: "codex",
+        targets: ["codex"],
         baseUrl: mock.url,
         model: "qwen2.5vl:7b",
       });
@@ -304,7 +305,7 @@ test("codex install: MCP section + AGENTS.md block + models.json fix, preserving
         cwd: project,
         home,
         nonInteractive: true,
-        target: "codex",
+        targets: ["codex"],
         baseUrl: mock.url,
         model: "qwen2.5vl:7b",
       });
@@ -328,7 +329,7 @@ test("dry-run install writes nothing", async () => {
         cwd: project,
         home,
         nonInteractive: true,
-        target: "both",
+        targets: ["claude", "codex"],
         baseUrl: mock.url,
         model: "qwen2.5vl:7b",
         dryRun: true,
@@ -366,7 +367,7 @@ test("doctor self-check: ok on healthy endpoint, warning on unreachable endpoint
         cwd: project,
         home,
         nonInteractive: true,
-        target: "claude",
+        targets: ["claude"],
         baseUrl: "http://127.0.0.1:1/v1",
         model: "qwen2.5vl:7b",
       });
@@ -402,7 +403,7 @@ test("uninstall removes managed artifacts, keeps config + user entries, preserve
         hooks: [{ type: "command", command: "node my-edit-hook.cjs" }],
       });
       writeFileSync(join(claudeDir, "settings.json"), JSON.stringify(settings, null, 2) + "\n", "utf8");
-      const report = await runUninstall({ cwd: project, home, target: "both" });
+      const report = await runUninstall({ cwd: project, home, targets: ["claude", "codex"] });
 
       // settings: our entries gone, user-added Edit entry kept
       const after = json(join(claudeDir, "settings.json"));
@@ -432,7 +433,7 @@ test("uninstall removes managed artifacts, keeps config + user entries, preserve
       assert.ok(report.kept.some((k) => k.includes("config.json + cache kept")));
 
       // second uninstall: no-op, no crash
-      const report2 = await runUninstall({ cwd: project, home, target: "both" });
+      const report2 = await runUninstall({ cwd: project, home, targets: ["claude", "codex"] });
       assert.equal(report2.removed.length, 0);
       assert.ok(report2.output.some((l) => l.includes("no deepseek-vl-support hook entries")));
     } finally {
@@ -455,7 +456,7 @@ test("uninstall keeps user-authored files without our marker and reports skipped
     writeFileSync(join(skillDir, "SKILL.md"), "# My hand-written skill\n", "utf8");
     writeFileSync(join(hooksDir, HOOK_FILENAME), "// hand-written hook, no marker\nconsole.log('hi');\n", "utf8");
     try {
-      const report = await runUninstall({ cwd: project, home, target: "claude" });
+      const report = await runUninstall({ cwd: project, home, targets: ["claude"] });
       assert.equal(text(join(skillDir, "SKILL.md")), "# My hand-written skill\n");
       assert.equal(text(join(hooksDir, HOOK_FILENAME)), "// hand-written hook, no marker\nconsole.log('hi');\n");
       assert.ok(report.skipped.some((s) => s.includes("SKILL.md")), `expected skip: ${report.skipped.join("|")}`);
@@ -476,12 +477,12 @@ test("--purge-config removes config dir + .gitignore line; dry-run removes nothi
       await installBoth(project, home, mock.url);
       const gitignore = join(project, ".gitignore");
 
-      const dry = await runUninstall({ cwd: project, home, target: "both", purgeConfig: true, dryRun: true });
+      const dry = await runUninstall({ cwd: project, home, targets: ["claude", "codex"], purgeConfig: true, dryRun: true });
       assert.ok(existsSync(join(project, ".deepseek-vl", "config.json")));
       assert.ok(text(gitignore).includes(GITIGNORE_ENTRY));
       assert.ok(dry.output.some((l) => l.includes("[dry-run]")));
 
-      const report = await runUninstall({ cwd: project, home, target: "both", purgeConfig: true });
+      const report = await runUninstall({ cwd: project, home, targets: ["claude", "codex"], purgeConfig: true });
       assert.ok(!existsSync(join(project, ".deepseek-vl")), "config + cache deleted with --purge-config");
       assert.ok(!text(gitignore).includes(GITIGNORE_ENTRY));
       assert.ok(report.removed.some((r) => r.includes(".gitignore")));
@@ -502,7 +503,7 @@ test("uninstall keeps the global-scope MCP section removal to the managed sectio
         cwd: project,
         home,
         nonInteractive: true,
-        target: "codex",
+        targets: ["codex"],
         global: true,
         baseUrl: mock.url,
         model: "qwen2.5vl:7b",
@@ -511,11 +512,165 @@ test("uninstall keeps the global-scope MCP section removal to the managed sectio
       // append an unrelated MCP server section
       writeFileSync(tomlPath, text(tomlPath) + '\n[mcp_servers.other]\ncommand = "other"\n', "utf8");
 
-      const report = await runUninstall({ cwd: project, home, target: "codex", global: true });
+      const report = await runUninstall({ cwd: project, home, targets: ["codex"], global: true });
       const after = text(tomlPath);
       assert.ok(!after.includes(MCP_SERVER_NAME));
       assert.ok(after.includes("[mcp_servers.other]"), "other MCP server section preserved");
       assert.ok(report.removed.some((r) => r.includes(MCP_SERVER_NAME)));
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+// ---------------------------------------------------------------- new target model
+
+test("parseTargets: comma list, dedupe, case-insensitive, default; rejects both/plugin/unknown/empty", () => {
+  assert.deepEqual(parseTargets(undefined), ["claude", "codex"]);
+  assert.deepEqual(parseTargets(""), ["claude", "codex"]);
+  assert.deepEqual(parseTargets("  "), ["claude", "codex"]);
+  assert.deepEqual(parseTargets("claude"), ["claude"]);
+  assert.deepEqual(parseTargets("Claude,KIRO,copilot"), ["claude", "kiro", "copilot"]);
+  assert.deepEqual(parseTargets("codex,codex,claude,claude"), ["codex", "claude"]);
+  assert.deepEqual(parseTargets("copilot,cursor,kiro,openclaw,hermes"), ["copilot", "cursor", "kiro", "openclaw", "hermes"]);
+  assert.deepEqual(parseTargets("vscode,grok,other"), ["vscode", "grok", "other"]);
+  assert.deepEqual(parseTargets("ChatGpt-Codex,NanoClaw"), ["chatgpt-codex", "nanoclaw"]);
+  assert.throws(() => parseTargets("both"), /invalid target: "both"/);
+  assert.throws(() => parseTargets("plugin"), /invalid target: "plugin"/);
+  assert.throws(() => parseTargets("bogus"), /expected one of: claude,codex,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/);
+  assert.throws(() => parseTargets("claude,bogus"), /invalid target: "bogus"/);
+  assert.throws(() => parseTargets(","), /invalid target: ""/);
+});
+
+test("agentMenuSpec: one flat 12-option multi-select, no both/plugin, detection annotations", () => {
+  const fakeHome = join(process.cwd(), "does-not-exist-home");
+  const spec = agentMenuSpec(fakeHome);
+  assert.deepEqual(spec.options.map((o) => o.value), AGENTS);
+  assert.equal(spec.options.length, 12);
+  assert.ok(spec.options.every((o) => o.value !== "both" && o.value !== "plugin"), "menu must not offer both/plugin");
+  // defaults: claude + codex (former "both") plus the plugin clients
+  // detected on THIS machine (mirrors the spec's default computation)
+  const detected = detectPluginClients(fakeHome);
+  assert.deepEqual(spec.default, ["claude", "codex", ...PLUGIN_CLIENTS.filter((c) => detected[c].detected)]);
+  // native entries explain their mechanism; plugin entries annotate detection
+  assert.ok(spec.options.find((o) => o.value === "claude")!.label.includes("hook"));
+  assert.ok(spec.options.find((o) => o.value === "codex")!.label.includes(".agents/skills/"), "codex label mentions the .agents/skills/ write");
+  for (const o of spec.options) {
+    if (o.value !== "claude" && o.value !== "codex" && o.value !== "other") {
+      assert.ok(o.label.startsWith(PLUGIN_CLIENT_LABELS[o.value as keyof typeof PLUGIN_CLIENT_LABELS]));
+      if (detected[o.value as keyof typeof detected].detected) {
+        assert.ok(!o.label.includes("not detected"), `detected client should not be annotated: ${o.label}`);
+      } else {
+        assert.ok(o.label.includes("not detected"), `undetected client should carry the annotation: ${o.label}`);
+      }
+    }
+  }
+  assert.equal(
+    spec.options.find((o) => o.value === "other")!.label,
+    PLUGIN_CLIENT_LABELS["other"],
+    "other is never annotated with detection status",
+  );
+});
+
+test("codex project scope: writes .agents/skills/deepseek-vision/SKILL.md (packaged content); uninstall removes only it", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      // a sibling skill that must survive uninstall (never touch siblings)
+      mkdirSync(join(project, ".agents", "skills", "sibling"), { recursive: true });
+      writeFileSync(join(project, ".agents", "skills", "sibling", "SKILL.md"), "# Sibling skill\n", "utf8");
+
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["codex"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      const written = join(project, ".agents", "skills", "deepseek-vision", "SKILL.md");
+      assert.ok(existsSync(written), ".agents/skills/deepseek-vision/SKILL.md written for project-scope codex");
+      assert.equal(text(written), text(join(ROOT, "skills", "deepseek-vision", "SKILL.md")), "content equals the packaged skill");
+      assert.ok(text(written).includes(SKILL_MARKER), "written skill carries the identity marker");
+      assert.ok(report.output.some((l) => l.includes(".agents/skills")), `write is logged: ${report.output.join("|")}`);
+
+      // re-install is idempotent (managed file, no --update)
+      const again = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["codex"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      assert.ok(again.output.some((l) => l.includes("exists (managed)")), `idempotent second run: ${again.output.join("|")}`);
+
+      // uninstall removes ONLY the deepseek-vision skill dir
+      const un = await runUninstall({ cwd: project, home, targets: ["codex"] });
+      assert.ok(!existsSync(join(project, ".agents", "skills", "deepseek-vision")), "our skill dir removed");
+      assert.ok(existsSync(join(project, ".agents", "skills", "sibling", "SKILL.md")), "sibling skill untouched");
+      assert.ok(un.agents?.find((a) => a.agent === "codex")?.detail.includes(".agents/skills"), "codex uninstall detail mentions the skill dir");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("codex global scope: .agents/skills/ is NOT written (project-level convention) and the skip is mentioned", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const report = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["codex"], global: true, baseUrl: mock.url, model: "qwen2.5vl:7b" });
+      assert.ok(!existsSync(join(project, ".agents")), "no .agents dir on a global codex install");
+      assert.ok(report.output.some((l) => l.includes("project-level")), `skip mentioned in the output: ${report.output.join("|")}`);
+      const codex = report.agents?.find((a) => a.agent === "codex");
+      assert.ok(codex?.detail.includes("skipped"), `skip mentioned in the agent detail: ${codex?.detail}`);
+      // the codex artifacts themselves still went global
+      assert.ok(existsSync(join(home, ".codex", "config.toml")));
+      assert.ok(!existsSync(join(project, ".codex")));
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("mixed run: claude + kiro = claude native artifacts + plugin materialization + GLOBAL config; uninstall reverses", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const report = await runInstall({
+        cwd: project,
+        home,
+        nonInteractive: true,
+        targets: ["claude", "kiro"],
+        baseUrl: mock.url,
+        model: "qwen2.5vl:7b",
+      });
+
+      // claude native artifacts (project scope — no --global passed)
+      assert.ok(existsSync(join(project, ".claude", "hooks", HOOK_FILENAME)));
+      assert.ok(existsSync(join(project, ".claude", "settings.json")));
+
+      // plugin dir materialized under the home config dir
+      assert.ok(existsSync(join(home, ".deepseek-vl", "plugin", "plugin.json")), "plugin dir must be materialized");
+
+      // endpoint config written GLOBAL (plugin agents are always global)
+      assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")));
+      assert.ok(!existsSync(join(project, ".deepseek-vl")), "no project config in a mixed run");
+      assert.ok(!existsSync(join(project, ".gitignore")), "no .gitignore entry for global config scope");
+
+      // report: unified per-agent shape for both agents
+      assert.equal(report.agents?.length, 2);
+      const claude = report.agents!.find((a) => a.agent === "claude")!;
+      assert.equal(claude.status, "ok");
+      assert.ok(claude.detail.includes("hook"));
+      const kiro = report.agents!.find((a) => a.agent === "kiro")!;
+      assert.ok(["manual", "ok"].includes(kiro.status), `kiro (not detected) should be manual guidance, got: ${kiro.status}`);
+      assert.ok(report.output.some((l) => l.startsWith("[claude] ok")), `expected per-agent line: ${report.output.join("|")}`);
+      assert.ok(report.output.some((l) => l.startsWith("[kiro]")), `expected per-agent line: ${report.output.join("|")}`);
+
+      // uninstall reverses: claude artifacts gone, kiro unregistered, config kept
+      const un = await runUninstall({ cwd: project, home, targets: ["claude", "kiro"] });
+      assert.ok(!existsSync(join(project, ".claude", "hooks", HOOK_FILENAME)));
+      assert.ok(!existsSync(join(project, ".claude", "settings.json")) || !text(join(project, ".claude", "settings.json")).includes(HOOK_COMMAND_IDENT));
+      assert.ok(un.agents!.some((a) => a.agent === "claude" && a.status === "ok"));
+      assert.ok(un.agents!.some((a) => a.agent === "kiro"), "kiro must have an uninstall result");
+      assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")), "config kept without --purge-config");
     } finally {
       await rm(base, { recursive: true, force: true });
     }

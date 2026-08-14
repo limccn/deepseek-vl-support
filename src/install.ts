@@ -1,7 +1,11 @@
-// Installer: numbered-menu wizard (interactive) or flags/env (CI), file
-// installation for Claude Code (hook + skill + slash command + settings.json
-// deep-merge) and Codex (config.toml MCP section + AGENTS.md block +
-// models.json fix), idempotent re-install, and marker-based uninstall.
+// Installer: numbered-menu wizard (interactive) or flags/env (CI). A single
+// flat agent list of 12 targets — claude, codex (native installs: Claude Code
+// hook + skill + slash command + settings.json deep-merge; Codex config.toml
+// MCP section + AGENTS.md block + models.json fix + project-scope
+// .agents/skills/ write) and copilot, cursor, kiro, openclaw, hermes, vscode,
+// chatgpt-codex, grok, nanoclaw, other (Agent Plugins mode: materialize the
+// plugin dir + per-client registration). Idempotent re-install and
+// marker-based uninstall; --target takes a comma-separated agent list.
 //
 // Safety rules:
 //  - settings.json / config.toml / AGENTS.md are backed up to `<file>.bak`
@@ -40,20 +44,81 @@ import {
   SKILL_DIRNAME,
   SKILL_MARKER,
 } from "./identity.ts";
-import { packageRoot, packagedHookPath, templatePath } from "./paths.ts";
+import { packageRoot, packagedHookPath, packagedSkillPath, templatePath } from "./paths.ts";
 import {
+  AGENTS,
   detectPluginClients,
   installPluginClients,
+  isPluginAgent,
   materializePluginDir,
   pluginDir,
   uninstallPluginClients,
   PLUGIN_CLIENT_LABELS,
   PLUGIN_CLIENTS,
 } from "./plugin.ts";
-import type { PluginClient, PluginClientResult } from "./plugin.ts";
+import type { Agent, PluginClient } from "./plugin.ts";
 import { askInput, askMenu, askMultiMenu, askSecret } from "./wizard.ts";
+import type { MultiMenuSpec } from "./wizard.ts";
 
-export type InstallTarget = "claude" | "codex" | "both" | "plugin";
+export type AgentStatus = "ok" | "skipped" | "failed" | "manual";
+
+/** Per-agent result: the unified report shape for every selected agent —
+ *  native claude/codex entries and plugin clients alike. */
+export interface AgentResult {
+  agent: Agent;
+  status: AgentStatus;
+  detail: string;
+}
+
+/** Outcome of one agent's install/uninstall step (the agent field is filled
+ *  in by the driver). */
+interface AgentOutcome {
+  status: "ok" | "failed";
+  detail: string;
+}
+
+/** Parse a comma-separated --target / DVLS_TARGET value into a validated
+ *  agent list. Absent/empty → the default (claude + codex, the former
+ *  "both"). Unknown names — including the removed "both" and "plugin"
+ *  values — are rejected with an error listing the valid agents. */
+export function parseTargets(raw: string | undefined): Agent[] {
+  if (raw === undefined || raw.trim() === "") return ["claude", "codex"];
+  const out: Agent[] = [];
+  for (const part of raw.split(",")) {
+    const t = part.trim().toLowerCase();
+    if (!(AGENTS as readonly string[]).includes(t)) {
+      throw new Error(`invalid target: "${part.trim()}" (expected one of: ${AGENTS.join(",")})`);
+    }
+    out.push(t as Agent);
+  }
+  return [...new Set(out)];
+}
+
+/** Build the wizard's first step: ONE multi-select of all 12 agents with
+ *  per-client detection annotations (plugin clients not found on this
+ *  machine are flagged "not detected — manual instructions"; `other` is
+ *  guidance-only and never annotated). This replaces the old single-choice
+ *  target menu (claude/codex/both/plugin) and the separate plugin-client
+ *  step. Exported for tests. */
+export function agentMenuSpec(home: string, env: NodeJS.ProcessEnv = process.env): MultiMenuSpec {
+  const detected = detectPluginClients(home, env);
+  return {
+    prompt: "Which agents should get vision?",
+    options: AGENTS.map((a) => ({
+      value: a,
+      label: isPluginAgent(a)
+        ? a === "other"
+          ? PLUGIN_CLIENT_LABELS[a]
+          : `${PLUGIN_CLIENT_LABELS[a]}${detected[a].detected ? "" : " (not detected — manual instructions)"}`
+        : a === "claude"
+          ? "Claude Code (hooks intercept Read automatically)"
+          : "Codex (also writes .agents/skills/ — usable by Cursor, GitHub Copilot, Kimi Code, etc.)",
+    })),
+    // Default: the former "both" default (claude + codex) plus the plugin
+    // clients detected on this machine (the former plugin-mode default).
+    default: ["claude", "codex", ...PLUGIN_CLIENTS.filter((c) => detected[c].detected)],
+  };
+}
 
 export interface Preset {
   id: string;
@@ -84,24 +149,29 @@ export function presetById(id: string): Preset | undefined {
 }
 
 export interface InstallAnswers {
-  target: InstallTarget;
+  targets: Agent[];
   baseUrl: string;
   model: string;
   apiKey: string;
   fallbacks: FallbackConfig[];
+  /** Chosen scope for the native claude/codex artifacts. Plugin agents are
+   *  always global; runInstall derives the effective config scope from
+   *  `targets` (any plugin agent ⇒ global config). */
   global: boolean;
-  clients?: PluginClient[];
 }
 
 export interface InstallOptions {
   cwd: string;
   home?: string;
   global?: boolean;
-  target?: InstallTarget;
+  targets?: Agent[];
   baseUrl?: string;
   model?: string;
   apiKey?: string;
   fallbacks?: FallbackConfig[];
+  /** Backward-compatible filter for plugin agents: effective plugin clients
+   *  = targets ∩ clients (non-interactive runs only; the wizard selects
+   *  agents directly). */
   clients?: PluginClient[];
   update?: boolean;
   dryRun?: boolean;
@@ -114,14 +184,15 @@ export interface InstallReport {
   output: string[];
   warnings: string[];
   doctor: DoctorReport | null;
-  pluginClients?: PluginClientResult[];
+  /** Per-agent results for every selected agent, plugin clients included. */
+  agents?: AgentResult[];
 }
 
 export interface UninstallOptions {
   cwd: string;
   home?: string;
   global?: boolean;
-  target?: InstallTarget;
+  targets?: Agent[];
   clients?: PluginClient[];
   purgeConfig?: boolean;
   dryRun?: boolean;
@@ -132,7 +203,9 @@ export interface UninstallReport {
   removed: string[];
   skipped: string[];
   kept: string[];
-  pluginClients?: PluginClientResult[];
+  warnings: string[];
+  /** Per-agent results for every selected agent, plugin clients included. */
+  agents?: AgentResult[];
 }
 
 function readVersion(root: string): string {
@@ -152,32 +225,11 @@ function isInteractive(): boolean {
 
 async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.ProcessEnv): Promise<InstallAnswers> {
   const presetSeed = seed.preset ? presetById(seed.preset) : undefined;
+  const home = seed.home ?? homedir();
 
-  const target = (await askMenu({
-    prompt: "Which tool to enhance?",
-    options: [
-      { value: "claude", label: "Claude Code (hooks intercept Read automatically)" },
-      { value: "codex", label: "Codex (MCP tool, invoked by the agent)" },
-      { value: "both", label: "Both" },
-      { value: "plugin", label: "Agent Plugin (GitHub Copilot / Cursor / Kiro / OpenClaw / Hermes)" },
-    ],
-    default: seed.target ?? env.DVLS_TARGET ?? "both",
-  })) as InstallTarget;
-
-  // Agent Plugins mode: multi-select clients, defaulting to detected ones
-  let clients: PluginClient[] | undefined;
-  if (target === "plugin") {
-    const home = seed.home ?? homedir();
-    const detected = detectPluginClients(home, env);
-    clients = (await askMultiMenu({
-      prompt: "Which clients should get the Agent Plugin?",
-      options: PLUGIN_CLIENTS.map((c) => ({
-        value: c,
-        label: `${PLUGIN_CLIENT_LABELS[c]}${detected[c].detected ? "" : " (not detected — manual instructions)"}`,
-      })),
-      default: PLUGIN_CLIENTS.filter((c) => detected[c].detected),
-    })) as PluginClient[];
-  }
+  // Step 1: ONE multi-select of all 12 agents (replaces the old
+  // claude/codex/both/plugin single-choice menu AND the plugin-client step).
+  const targets = (await askMultiMenu(agentMenuSpec(home, env))) as Agent[];
 
   const presetId = await askMenu({
     prompt: "Vision endpoint preset",
@@ -209,10 +261,14 @@ async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.Proce
     default: "",
   });
 
-  // plugin mode has no project/global split: the endpoint config is always
-  // written to the global ~/.deepseek-vl/config.json (project configs are not
-  // visible to the clients' MCP subprocesses)
-  const global = target === "plugin" ||
+  // The scope question is asked only when a native install (claude/codex)
+  // is selected; plugin agents are always global. When only plugin agents
+  // are selected the step is skipped entirely (endpoint config is written to
+  // the global ~/.deepseek-vl/config.json — project configs are not visible
+  // to the clients' MCP subprocesses).
+  const needsScope = targets.includes("claude") || targets.includes("codex");
+  const global =
+    needsScope &&
     (await askMenu({
       prompt: "Install scope",
       options: [
@@ -223,26 +279,24 @@ async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.Proce
     })) === "global";
 
   return {
-    target,
+    targets,
     baseUrl: baseUrl || DEFAULT_BASE_URL,
     model: model || "",
     apiKey,
     fallbacks: parseFallbacks(fallbackRaw),
     global,
-    clients,
   };
 }
 
 function collectNonInteractiveAnswers(opts: InstallOptions, env: NodeJS.ProcessEnv): InstallAnswers {
   const preset = opts.preset ? presetById(opts.preset) : undefined;
-  const target = opts.target ?? (env.DVLS_TARGET as InstallTarget | undefined) ?? "both";
-  const global = target === "plugin" || (opts.global ?? env.DVLS_SCOPE === "global");
+  const targets = parseTargets(opts.targets ? opts.targets.join(",") : env.DVLS_TARGET);
+  const global = opts.global ?? env.DVLS_SCOPE === "global";
   const baseUrl = opts.baseUrl ?? env.VISION_BASE_URL ?? preset?.baseUrl ?? DEFAULT_BASE_URL;
   const model = opts.model ?? env.VISION_MODEL ?? preset?.model ?? "";
   const apiKey = opts.apiKey ?? env.VISION_API_KEY ?? "";
   const fallbacks = opts.fallbacks ?? parseFallbacks(env.VISION_FALLBACKS);
-  const clients = opts.clients ?? [...PLUGIN_CLIENTS];
-  return { target, baseUrl, model, apiKey, fallbacks, global, clients };
+  return { targets, baseUrl, model, apiKey, fallbacks, global };
 }
 
 // ---------------------------------------------------------------- file helpers
@@ -367,7 +421,7 @@ function removeGitignoreLine(cwd: string, entry: string): boolean {
 
 // ---------------------------------------------------------------- install
 
-async function installClaude(opts: InstallOptions, answers: InstallAnswers, report: InstallReport): Promise<void> {
+async function installClaude(opts: InstallOptions, answers: InstallAnswers, report: InstallReport): Promise<AgentOutcome> {
   const log = opts.log ?? ((m: string) => report.output.push(m));
   const home = opts.home ?? homedir();
   const claudeDir = answers.global ? join(home, ".claude") : join(opts.cwd, ".claude");
@@ -388,9 +442,11 @@ async function installClaude(opts: InstallOptions, answers: InstallAnswers, repo
   // 1) hook bundle
   const hookSource = readTextFile(packagedHookPath());
   if (hookSource === null) {
-    report.warnings.push(
-      `missing ${packagedHookPath()} — run \`npm run build\` first.`,
-    );
+    const msg = `missing ${packagedHookPath()} — run \`npm run build\` first`;
+    report.warnings.push(msg);
+    // the remaining artifacts still install (existing behavior), but the
+    // agent entry reports the incomplete install
+    return { status: "failed", detail: msg };
   } else {
     writeManagedFile(hookPath, hookSource, { update: opts.update, dryRun: opts.dryRun, marker: HOOK_MARKER }, log, report.warnings);
   }
@@ -443,9 +499,13 @@ async function installClaude(opts: InstallOptions, answers: InstallAnswers, repo
   }
 
   log(`Claude Code: restart your session for hooks to take effect.`);
+  return {
+    status: "ok",
+    detail: `hook + skill + /vision command + settings.json hooks (scope: ${answers.global ? "global" : "project"})${opts.dryRun ? " [dry-run, nothing written]" : ""}`,
+  };
 }
 
-async function installCodex(opts: InstallOptions, answers: InstallAnswers, report: InstallReport): Promise<void> {
+async function installCodex(opts: InstallOptions, answers: InstallAnswers, report: InstallReport): Promise<AgentOutcome> {
   const log = opts.log ?? ((m: string) => report.output.push(m));
   const home = opts.home ?? homedir();
   const codexDir = answers.global ? join(home, ".codex") : join(opts.cwd, ".codex");
@@ -469,6 +529,25 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
         ? `${AGENTS_START_MARKER} block written to ${agentsFile}${r2.backup ? ` (backup: ${r2.backup})` : ""}`
         : `AGENTS.md already has our block — idempotent, no change.`,
     );
+  }
+
+  // 5) .agents/skills (project scope only): many tools follow the Codex
+  //    skill contract and read skills from <project>/.agents/skills/
+  //    (<name>/SKILL.md) — Cursor, GitHub Copilot, Kimi Code, etc. Global
+  //    installs skip it (it is a project-level convention) and mention the
+  //    skip. The content is the packaged skill (assets/SKILL.md, committed
+  //    as skills/deepseek-vision/SKILL.md), which carries SKILL_MARKER so
+  //    uninstall can tell our file from a user-authored one.
+  if (answers.global) {
+    log(`skipped .agents/skills/deepseek-vision/ write — project-level convention (global scope)`);
+  } else {
+    const agentsSkillsMd = join(opts.cwd, ".agents", "skills", SKILL_DIRNAME, "SKILL.md");
+    const packaged = readTextFile(packagedSkillPath());
+    if (packaged === null) {
+      report.warnings.push(`missing ${packagedSkillPath()} — run \`npm run build\` first (skipping .agents/skills write)`);
+    } else {
+      writeManagedFile(agentsSkillsMd, packaged, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER }, log, report.warnings);
+    }
   }
 
   // models.json bug fix (#36382)
@@ -499,6 +578,13 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
     );
   }
   log(`Codex: restart your Codex session; verify with \`codex mcp list\`.`);
+  const agentsSkills = answers.global
+    ? " (global scope; .agents/skills/ skipped — project-level convention)"
+    : " + .agents/skills/deepseek-vision/ (project scope)";
+  return {
+    status: "ok",
+    detail: `MCP server section + AGENTS.md block + models.json fix${agentsSkills}${opts.dryRun ? " [dry-run, nothing written]" : ""}`,
+  };
 }
 
 export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
@@ -510,10 +596,17 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   const answers = interactive ? await collectInteractiveAnswers(opts, env) : collectNonInteractiveAnswers(opts, env);
 
   const home = opts.home ?? homedir();
-  const configDir = answers.global ? globalConfigDir(home) : join(opts.cwd, CONFIG_DIR);
+  const hasPlugin = answers.targets.some(isPluginAgent);
+  // Plugin agents are always global: their MCP subprocesses resolve config as
+  // env > global > defaults and cannot see project configs. Mixed runs
+  // (e.g. claude + copilot) therefore write the endpoint config globally; a
+  // project-scope claude install still resolves it via the project → global
+  // fallback in resolveConfig().
+  const configGlobal = hasPlugin || answers.global;
+  const configDir = configGlobal ? globalConfigDir(home) : join(opts.cwd, CONFIG_DIR);
   const configFile = join(configDir, "config.json");
 
-  log(`deepseek-vl-support installer (target: ${answers.target}, scope: ${answers.global ? "global" : "project"})`);
+  log(`deepseek-vl-support installer (targets: ${answers.targets.join(",")}, scope: ${configGlobal ? "global" : "project"})`);
 
   // 1) config.json (deep-merge write)
   if (opts.dryRun) {
@@ -529,7 +622,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   }
 
   // 2) .gitignore (project scope only — protects the API key from git)
-  if (!answers.global) {
+  if (!configGlobal) {
     if (opts.dryRun) {
       log(`[dry-run] would append "${GITIGNORE_ENTRY}" to ${join(opts.cwd, ".gitignore")}`);
     } else if (upsertGitignore(opts.cwd, GITIGNORE_ENTRY)) {
@@ -539,12 +632,32 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
     }
   }
 
-  // 3) per-target artifacts
-  if (answers.target === "plugin") {
-    await installPluginTarget(opts, answers, report);
-  } else {
-    if (answers.target === "claude" || answers.target === "both") await installClaude(opts, answers, report);
-    if (answers.target === "codex" || answers.target === "both") await installCodex(opts, answers, report);
+  // 3) per-agent artifacts (aggregate results across all selected agents)
+  const agents: AgentResult[] = [];
+  for (const agent of answers.targets) {
+    if (agent === "claude" || agent === "codex") {
+      try {
+        const out = agent === "claude"
+          ? await installClaude(opts, answers, report)
+          : await installCodex(opts, answers, report);
+        agents.push({ agent, status: out.status, detail: out.detail });
+      } catch (e) {
+        agents.push({
+          agent,
+          status: "failed",
+          detail: `unexpected error: ${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
+    }
+  }
+  if (hasPlugin) {
+    agents.push(...(await installPluginAgents(opts, answers, report)));
+  }
+  report.agents = agents;
+  for (const r of agents) log(`[${r.agent}] ${r.status}: ${r.detail}`);
+  const failed = agents.filter((r) => r.status === "failed");
+  if (failed.length > 0) {
+    report.warnings.push(`${failed.length} agent(s) failed — see the per-agent lines above for guidance.`);
   }
 
   // 4) doctor self-check
@@ -565,15 +678,17 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   return report;
 }
 
-// ---------------------------------------------------------------- Agent Plugins target
+// ---------------------------------------------------------------- Agent Plugins agents
 
-/** Agent Plugins mode install: materialize ~/.deepseek-vl/plugin/ from the
- *  package root, then register the plugin with each requested client
- *  (failure-isolated; one client's error never blocks the others). */
-async function installPluginTarget(opts: InstallOptions, answers: InstallAnswers, report: InstallReport): Promise<void> {
+/** Agent Plugins install for the selected plugin agents: materialize
+ *  ~/.deepseek-vl/plugin/ once from the package root, then register with each
+ *  selected client (failure-isolated inside installPluginClients). Returns
+ *  per-agent results in the unified report shape. */
+async function installPluginAgents(opts: InstallOptions, answers: InstallAnswers, report: InstallReport): Promise<AgentResult[]> {
   const log = opts.log ?? ((m: string) => report.output.push(m));
   const home = opts.home ?? homedir();
   const destRoot = pluginDir(home);
+  const selected = answers.targets.filter(isPluginAgent);
 
   // 1) materialize the plugin dir (idempotent overwrite; refreshed each install)
   const materialized = materializePluginDir(packageRoot(), destRoot, opts.dryRun ?? false);
@@ -581,47 +696,52 @@ async function installPluginTarget(opts: InstallOptions, answers: InstallAnswers
     report.warnings.push(
       `missing package files: ${materialized.missing.join(", ")} — run \`npm run build\` first.`,
     );
-    return;
+    return selected.map((client) => ({
+      agent: client,
+      status: "failed" as const,
+      detail: "missing packaged plugin files — run `npm run build` first",
+    }));
   }
   for (const dest of materialized.written) {
     log(opts.dryRun ? `[dry-run] would write ${dest}` : `materialized ${dest}`);
   }
 
-  // 2) per-client registration
+  // 2) per-client registration: effective clients = targets ∩ --clients
+  //    (--clients is a backward-compatible filter for non-interactive runs)
+  const clients = (opts.clients ?? selected).filter((c) =>
+    (selected as readonly PluginClient[]).includes(c),
+  );
+  if (opts.clients !== undefined && clients.length === 0) {
+    report.warnings.push(
+      `--clients ${opts.clients.join(",")} does not intersect the selected plugin agents (${selected.join(",")}) — nothing registered.`,
+    );
+  }
+
   const detection = detectPluginClients(home);
   const results = await installPluginClients(
-    { home, pluginDir: destRoot, clients: answers.clients, dryRun: opts.dryRun, env: process.env },
+    { home, pluginDir: destRoot, clients, dryRun: opts.dryRun, env: process.env },
     detection,
   );
-  report.pluginClients = results;
-  for (const r of results) log(`[${r.client}] ${r.status}: ${r.detail}`);
-  const failed = results.filter((r) => r.status === "failed");
-  if (failed.length > 0) {
-    report.warnings.push(`${failed.length} client(s) failed — see the per-client lines above for guidance.`);
-  }
+  return results.map((r) => ({ agent: r.client, status: r.status, detail: r.detail }));
 }
 
-/** Agent Plugins mode uninstall: unregister per client (reverse of install),
- *  keep the materialized plugin dir unless --purge-config. */
-async function uninstallPluginTarget(opts: UninstallOptions, report: UninstallReport): Promise<void> {
-  const log = (m: string) => report.output.push(m);
+/** Agent Plugins uninstall: unregister each selected client (reverse of
+ *  install); the materialized plugin dir is removed only via --purge-config
+ *  (it lives inside the config dir and is deleted with it). */
+async function uninstallPluginAgents(opts: UninstallOptions, report: UninstallReport): Promise<AgentResult[]> {
   const home = opts.home ?? homedir();
   const destRoot = pluginDir(home);
+  const selected = (opts.targets ?? ["claude", "codex"]).filter(isPluginAgent);
+  const clients = (opts.clients ?? selected).filter((c) =>
+    (selected as readonly PluginClient[]).includes(c),
+  );
 
   const detection = detectPluginClients(home);
   const results = await uninstallPluginClients(
-    { home, pluginDir: destRoot, clients: opts.clients, dryRun: opts.dryRun, env: process.env },
+    { home, pluginDir: destRoot, clients, dryRun: opts.dryRun, env: process.env },
     detection,
   );
-  report.pluginClients = results;
-  for (const r of results) log(`[${r.client}] ${r.status}: ${r.detail}`);
-
-  if (opts.purgeConfig) {
-    log(`materialized plugin dir is removed with ${join(home, CONFIG_DIR)} (--purge-config)`);
-  } else {
-    report.kept.push(`${destRoot} (materialized plugin dir kept; --purge-config deletes it)`);
-    log(`materialized plugin dir kept: ${destRoot} (use --purge-config to delete)`);
-  }
+  return results.map((r) => ({ agent: r.client, status: r.status, detail: r.detail }));
 }
 
 // ---------------------------------------------------------------- uninstall
@@ -756,35 +876,80 @@ async function uninstallCodex(opts: UninstallOptions, report: UninstallReport, l
       log(`no deepseek-vl-support block in ${agentsFile}`);
     }
   }
+
+  // .agents/skills (project scope only): remove ONLY our deepseek-vision
+  // skill dir. Sibling skills in .agents/skills/ are never touched, and
+  // removeEmptyDirTree deletes only directories that became empty (any
+  // user-authored leftover keeps the tree).
+  if (!opts.global) {
+    const agentsSkillsDir = join(opts.cwd, ".agents", "skills", SKILL_DIRNAME);
+    removeFileIfManaged(join(agentsSkillsDir, "SKILL.md"), SKILL_MARKER, report, opts);
+    if (!opts.dryRun && existsSync(agentsSkillsDir)) {
+      report.removed.push(...removeEmptyDirTree(agentsSkillsDir));
+    }
+  }
+
   report.kept.push(
     `models.json fixes are NOT reverted automatically (they are safe/helpful).`,
   );
 }
 
 export async function runUninstall(opts: UninstallOptions): Promise<UninstallReport> {
-  const report: UninstallReport = { output: [], removed: [], skipped: [], kept: [] };
+  const report: UninstallReport = { output: [], removed: [], skipped: [], kept: [], warnings: [] };
   const log = (m: string) => report.output.push(m);
-  const target = opts.target ?? "both";
+  const targets = opts.targets ?? ["claude", "codex"];
   const home = opts.home ?? homedir();
+  const hasPlugin = targets.some(isPluginAgent);
+  // Mirror of the install side: plugin agents are always global, so a run
+  // that includes any plugin agent considers the config global.
+  const configGlobal = hasPlugin || opts.global;
 
-  log(`deepseek-vl-support uninstaller (target: ${target}, scope: ${opts.global || target === "plugin" ? "global" : "project"})`);
+  log(`deepseek-vl-support uninstaller (targets: ${targets.join(",")}, scope: ${configGlobal ? "global" : "project"})`);
 
-  if (target === "plugin") {
-    await uninstallPluginTarget(opts, report);
-  } else {
-    if (target === "claude" || target === "both") await uninstallClaude(opts, report, log);
-    if (target === "codex" || target === "both") await uninstallCodex(opts, report, log);
+  // per-agent artifact removal (aggregate results across all selected agents)
+  const agents: AgentResult[] = [];
+  for (const agent of targets) {
+    if (agent === "claude") {
+      try {
+        await uninstallClaude(opts, report, log);
+        agents.push({ agent, status: "ok", detail: "artifacts removed (see [REMOVED] lines above)" });
+      } catch (e) {
+        agents.push({ agent, status: "failed", detail: `unexpected error: ${e instanceof Error ? e.message : String(e)}` });
+      }
+    } else if (agent === "codex") {
+      try {
+        await uninstallCodex(opts, report, log);
+        agents.push({
+          agent,
+          status: "ok",
+          detail: `MCP section + AGENTS.md block removed${opts.global ? "" : " + .agents/skills/deepseek-vision/"}`,
+        });
+      } catch (e) {
+        agents.push({ agent, status: "failed", detail: `unexpected error: ${e instanceof Error ? e.message : String(e)}` });
+      }
+    }
+  }
+  if (hasPlugin) {
+    agents.push(...(await uninstallPluginAgents(opts, report)));
+  }
+  report.agents = agents;
+  for (const r of agents) log(`[${r.agent}] ${r.status}: ${r.detail}`);
+  const failed = agents.filter((r) => r.status === "failed");
+  if (failed.length > 0) {
+    report.warnings.push(`${failed.length} agent(s) failed — see the per-agent lines above for guidance.`);
   }
 
-  // .gitignore line: only with --purge-config (plugin mode is always global)
-  const configDir = opts.global || target === "plugin" ? globalConfigDir(home) : join(opts.cwd, CONFIG_DIR);
+  // config: with --purge-config the config dir (incl. the materialized
+  // plugin dir, which lives inside it) is deleted; project-scope runs also
+  // drop the .gitignore line
+  const configDir = configGlobal ? globalConfigDir(home) : join(opts.cwd, CONFIG_DIR);
   if (opts.purgeConfig) {
-    if (!opts.global && !opts.dryRun && removeGitignoreLine(opts.cwd, GITIGNORE_ENTRY)) {
+    if (!configGlobal && !opts.dryRun && removeGitignoreLine(opts.cwd, GITIGNORE_ENTRY)) {
       report.removed.push(join(opts.cwd, ".gitignore") + ` ("${GITIGNORE_ENTRY}" line)`);
       log(`removed "${GITIGNORE_ENTRY}" from .gitignore`);
     }
     if (opts.dryRun) {
-      log(`[dry-run] would delete ${configDir} (config + cache)`);
+      log(`[dry-run] would delete ${configDir} (config + cache${hasPlugin ? " + materialized plugin dir" : ""})`);
     } else if (existsSync(configDir)) {
       rmSync(configDir, { recursive: true, force: true });
       report.removed.push(configDir);
@@ -793,7 +958,7 @@ export async function runUninstall(opts: UninstallOptions): Promise<UninstallRep
       log(`no ${configDir}`);
     }
   } else {
-    report.kept.push(`${configDir} (config.json + cache kept; --purge-config deletes it)`);
+    report.kept.push(`${configDir} (config.json + cache${hasPlugin ? " + materialized plugin dir" : ""} kept; --purge-config deletes it)`);
     log(`config + cache kept (use --purge-config to delete)`);
   }
 

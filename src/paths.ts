@@ -38,3 +38,12 @@ export function packagedPromptPath(): string {
 export function packagedHookPath(): string {
   return join(packageRoot(), "dist", "hook.cjs");
 }
+
+/** Packaged Agent Plugins skill copy (skills/deepseek-vision/SKILL.md,
+ *  build-synced from assets/SKILL.md and committed for git installs). It is
+ *  the source for the project-scope Codex `.agents/skills/` write — the
+ *  Codex skill contract many tools (Cursor, GitHub Copilot, Kimi Code, …)
+ *  read from <project>/.agents/skills/<name>/SKILL.md. */
+export function packagedSkillPath(): string {
+  return join(packageRoot(), "skills", "deepseek-vision", "SKILL.md");
+}

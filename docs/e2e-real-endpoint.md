@@ -16,14 +16,14 @@ vision endpoint (D5). Run it once per release in a clean directory.
 mkdir -p ~/tmp/dvls-e2e && cd ~/tmp/dvls-e2e
 rm -rf project && mkdir project && cd project
 npx deepseek-vl-support install --non-interactive \
-  --target both --preset openrouter \
+  --target claude,codex --preset openrouter \
   --api-key $OPENROUTER_API_KEY
 ```
 
 Verify (dry-run first, predictable results):
 
 ```bash
-npx deepseek-vl-support install --dry-run --non-interactive --target both --preset openrouter
+npx deepseek-vl-support install --dry-run --non-interactive --target claude,codex --preset openrouter
 # [dry-run] ... preview only, nothing is written
 ls -R .deepseek-vl .claude .codex .gitignore   # generated as expected
 cat .gitignore                                  # contains .deepseek-vl/
@@ -100,15 +100,18 @@ deepseek-vl-support uninstall --purge-config    # remove all artifacts + config/
 git status                              # the project directory should be clean again
 ```
 
-## 9. Agent Plugins (Copilot / Cursor / Kiro / OpenClaw / Hermes)
+## 9. Agent Plugins (10 clients)
 
 Run once per release on machines that actually have the client installed.
 Prerequisite: the real endpoint configured (see step 0) and `npm run build`.
 
 ```bash
-npx deepseek-vl-support install --target plugin --preset openrouter --api-key $OPENROUTER_API_KEY
-# menu: pick the clients present on this machine; scope is skipped (always global)
-ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + .mcp.json + skills/
+npx deepseek-vl-support install --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other --preset openrouter --api-key $OPENROUTER_API_KEY
+# menu: one multi-select list of all 12 agents (claude + codex native,
+# 10 plugin clients); plugin agents not detected on this machine are
+# flagged "(not detected — manual instructions)"; scope is skipped when
+# only plugin agents are selected (they are always global)
+ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + .mcp.json + skills/ (exactly 4 entries)
 ```
 
 ### 9.1 GitHub Copilot
@@ -130,7 +133,7 @@ ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + .mcp.json + skil
       confirm `describe_image` is available and performs a REAL vision call
       — the remaining R4 verification (not possible on the 2026-08-14 box,
       which was not signed in).
-- [ ] Uninstall: `npx deepseek-vl-support uninstall --target plugin --clients copilot`,
+- [ ] Uninstall: `npx deepseek-vl-support uninstall --target copilot`,
       then `copilot plugin list` no longer lists it
 
 ### 9.2 Cursor
@@ -192,6 +195,77 @@ spawn, no PATHEXT), note it here — the documented next step is re-triggering
 the R3 fallback (bundled `node` + `${PLUGIN_ROOT}` entry, spec §9.2
 expansion is guaranteed) for that client.
 
+### 9.7 VS Code (settings write, no CLI)
+
+- [ ] Install line reports `[vscode] ok` and the user `settings.json` (see
+      `chat.pluginLocations`) gained an entry
+      `"<abs path to ~/.deepseek-vl/plugin>": true`; the first modify
+      backed the original file up as `settings.json.bak`
+- [ ] VS Code → Reload Window (Developer), then ask for a screenshot
+      description in a chat session: the `deepseek-vision` skill / MCP tools
+      are discovered and work (real vision call)
+- [ ] Uninstall removes only our `chat.pluginLocations` entry — a
+      pre-existing user entry survives untouched
+
+### 9.8 Grok Bot
+
+- [ ] With the `grok` CLI on PATH: install line reports
+      `grok plugin install ~/.deepseek-vl/plugin --trust` ran and
+      `grok plugin list` lists `deepseek-vl-support`
+- [ ] In the Grok UI: Plugins tab → press `r` (refresh) or start a new
+      session, then ask for a screenshot description — the
+      `deepseek-vision` skill / MCP tools are discovered (real vision call)
+- [ ] `grok inspect` verifies the MCP server configuration; record whether
+      Grok reads `mcp.json` (spec location) or only `.mcp.json` (its default
+      dot-convention file) — the guidance's dot-convention caveat stands
+      until confirmed
+- [ ] Without the CLI: install prints manual guidance (mentioning
+      `~/.grok/plugins/` + the `.mcp.json` caveat) and reports `[grok] manual`
+- [ ] Uninstall: `npx deepseek-vl-support uninstall --target grok` runs
+      `grok plugin uninstall deepseek-vl-support --confirm`
+
+### 9.9 ChatGPT & Codex (codex plugin mode)
+
+- [ ] With the `codex` CLI on PATH: install line reports the marketplace add
+      + plugin add commands; `codex plugin list` shows
+      `deepseek-vl-support@deepseek-vl-support`
+- [ ] The local marketplace shim exists at `~/.deepseek-vl/marketplace/`
+      (`marketplace.json` manifest + `plugin/` copy) — note it is OUTSIDE
+      the materialized dir, so `ls ~/.deepseek-vl/plugin/` still shows
+      exactly 4 entries
+- [ ] A new Codex thread (or ChatGPT session) picks up the plugin: ask for a
+      screenshot description and confirm a REAL vision call
+- [ ] Without the CLI: install prints manual guidance and reports
+      `[chatgpt-codex] manual`
+- [ ] Uninstall: `npx deepseek-vl-support uninstall --target chatgpt-codex`
+      runs `codex plugin remove deepseek-vl-support@deepseek-vl-support` and
+      KEEPS the marketplace registration + shim (documented decision)
+
+### 9.10 NanoClaw
+
+- [ ] With the `ncl` CLI on PATH: install line reports the template copy to
+      `~/.deepseek-vl/nanoclaw-templates/` (a real copy, never a symlink —
+      NanoClaw rejects symlinks) plus
+      `ncl groups create --template deepseek-vl-support --name "DeepSeek Vision"`
+      with `NANOCLAW_TEMPLATES_DIR` set
+- [ ] `ncl groups list` shows the stamped group; note the stamping does NOT
+      wire a channel — run `ncl wirings create` per the guidance, and tasks
+      start paused
+- [ ] Without the CLI: install prints manual guidance and reports
+      `[nanoclaw] manual`
+- [ ] Uninstall is manual (NanoClaw has no plugin uninstall) — report-only;
+      delete the stamped group to clean up
+
+### 9.11 Generic `other` (Agent Plugins open standard)
+
+- [ ] Install materializes `~/.deepseek-vl/plugin/` and prints the portable
+      install guidance (pointing at agent-plugins.org/specification);
+      report is `[other] manual`
+- [ ] Follow the guidance for any spec-compliant agent you want to test
+      (import the plugin dir), then ask for a screenshot description
+- [ ] Uninstall is report-only (manual); the materialized dir is kept unless
+      `--purge-config`
+
 ## Pass criteria
 
 - [ ] Steps 1–4 all match expectations (doctor exit code 0, describe returns a
@@ -203,5 +277,9 @@ expansion is guaranteed) for that client.
       test machine (skill discoverable + a real describe_image call), the
       Copilot session-level R4 check completed on an authenticated machine,
       bare `npx` launch confirmed per client (§9.6, or the risk triggered
-      for a client is documented), and R2 uninstall command names confirmed
+      for a client is documented), R2 uninstall command names confirmed,
+      and the new-client behaviors recorded (§9.7 VS Code settings entry
+      and `.bak` backup; §9.8 Grok `.mcp.json` caveat resolved; §9.9
+      chatgpt-codex marketplace shim + uninstall keeps registration;
+      §9.10 NanoClaw template copy / no symlinks; §9.11 other guidance)
 - [ ] No leftovers in the directory after uninstall

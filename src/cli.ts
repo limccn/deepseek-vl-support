@@ -5,11 +5,10 @@
 import { join } from "node:path";
 import { describe, VisionSizeError } from "./client.ts";
 import { runDoctor } from "./doctor.ts";
-import { runInstall, runUninstall } from "./install.ts";
-import type { InstallTarget } from "./install.ts";
+import { parseTargets, runInstall, runUninstall } from "./install.ts";
 import { runMcpServer } from "./mcp.ts";
 import { PLUGIN_CLIENTS } from "./plugin.ts";
-import type { PluginClient } from "./plugin.ts";
+import type { Agent, PluginClient } from "./plugin.ts";
 import {
   humanBytes,
   maskApiKey,
@@ -92,12 +91,30 @@ Usage:
   deepseek-vl-support mcp                                  Run the MCP stdio server (for Codex)
   deepseek-vl-support version                              Print version
 
-install options: --target claude|codex|both|plugin --global --update --dry-run
+install options: --target <agent,...> --global --update --dry-run
                  --non-interactive --preset <id> --base-url <url> --model <id>
                  --api-key <key> --fallbacks <json|"m@url,..."> --dir <project>
-                 --clients copilot,cursor,kiro,openclaw,hermes (plugin target)
-uninstall options: --target claude|codex|both|plugin --global --purge-config
-                 --dry-run --clients <list> (plugin target)
+uninstall options: --target <agent,...> --global --purge-config --dry-run
+
+Agents (--target, comma-separated, default claude,codex):
+  claude        Claude Code hook + skill + /vision command (project or global)
+  codex         Codex MCP server + AGENTS.md (project or global; project scope
+                also writes .agents/skills/deepseek-vision/ — readable by
+                Cursor, GitHub Copilot, Kimi Code, etc.)
+  copilot       GitHub Copilot via Agent Plugins (always global)
+  cursor        Cursor via Agent Plugins (always global)
+  kiro          Kiro via Agent Plugins (always global)
+  openclaw      OpenClaw via Agent Plugins (always global)
+  hermes        Hermes Agent via Agent Plugins (always global)
+  vscode        VS Code via Agent Plugins (always global)
+  chatgpt-codex ChatGPT & Codex via Agent Plugins (always global)
+  grok          Grok Bot via Agent Plugins (always global)
+  nanoclaw      NanoClaw via Agent Plugins (always global)
+  other         Other Agent Plugins-compatible agents (always global, guidance)
+
+--clients <list> (legacy): filter for plugin agents in non-interactive runs;
+  effective plugin agents = --target ∩ --clients. The old --target plugin
+  value is gone: use e.g. --target copilot,cursor instead.
 
 Config resolution: env VISION_* > project .deepseek-vl/config.json >
 global ~/.deepseek-vl/config.json > defaults.
@@ -276,19 +293,20 @@ function parseClients(raw: string | undefined): PluginClient[] | undefined {
   return out;
 }
 
-const TARGETS: readonly InstallTarget[] = ["claude", "codex", "both", "plugin"];
-
 async function runInstallFromCli(args: ParsedArgs): Promise<void> {
   const { flags } = args;
-  const target = flags.get("target");
-  if (target !== undefined && !(TARGETS as readonly string[]).includes(target)) {
-    fail(`--target must be ${TARGETS.join("|")}, got: ${target}`);
+  const targetRaw = flags.get("target");
+  let targets: Agent[] | undefined;
+  try {
+    targets = parseTargets(targetRaw);
+  } catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
   }
   const cwd = flags.get("dir") ?? process.cwd();
   const report = await runInstall({
     cwd,
     global: flagBool(flags, "global"),
-    target: (target as InstallTarget) ?? "both",
+    targets,
     nonInteractive: flagBool(flags, "non-interactive"),
     update: flagBool(flags, "update"),
     dryRun: flagBool(flags, "dry-run"),
@@ -305,15 +323,18 @@ async function runInstallFromCli(args: ParsedArgs): Promise<void> {
 
 async function runUninstallFromCli(args: ParsedArgs): Promise<void> {
   const { flags } = args;
-  const target = flags.get("target");
-  if (target !== undefined && !(TARGETS as readonly string[]).includes(target)) {
-    fail(`--target must be ${TARGETS.join("|")}, got: ${target}`);
+  const targetRaw = flags.get("target");
+  let targets: Agent[] | undefined;
+  try {
+    targets = parseTargets(targetRaw);
+  } catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
   }
   const cwd = flags.get("dir") ?? process.cwd();
   const report = await runUninstall({
     cwd,
     global: flagBool(flags, "global"),
-    target: (target as InstallTarget) ?? "both",
+    targets,
     clients: parseClients(flags.get("clients")),
     purgeConfig: flagBool(flags, "purge-config"),
     dryRun: flagBool(flags, "dry-run"),

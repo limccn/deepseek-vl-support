@@ -52,7 +52,7 @@ npx deepseek-vl-support@latest install
 
 | # | 问题 | 什么意思 | 默认值 |
 |---|---|---|---|
-| 1 | 增强哪个工具？ | 你用的 AI 工具：`claude` / `codex` / `both`（两个都装） | both |
+| 1 | 哪些 agent 要装视觉？ | 多选（逗号分隔的数字）：`claude`、`codex`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、`other`——本机未检测到的插件客户端会标注"not detected"（提供手动指引） | claude, codex + 检测到的插件客户端 |
 | 2 | 视觉端点预设 | 用哪家"看图服务"——选你注册了账号的那家（见下方端点表） | openrouter |
 | 3 | 端点地址（Base URL） | 那家服务的地址（预设已帮你填好） | 来自预设 |
 | 4 | API key | 那家服务的密钥；只存在你自己的电脑上 | 回车跳过 |
@@ -95,6 +95,10 @@ npx deepseek-vl-support@latest describe path/to/a/picture.png
   自动收到描述。手动方式：`/vision path/to/picture.png "你的问题"`。
 - **Codex**：让模型调用 `mcp__deepseek-vl__describe_image(path)`；
   `mcp__deepseek-vl__vision_status()` 显示当前设置和健康检查结果。
+  **项目级**的 Codex 安装还会把技能写到项目里的
+  `.agents/skills/deepseek-vision/SKILL.md` —— 这是 Codex 技能约定的位置，
+  Cursor、GitHub Copilot、Kimi Code 等工具都会从这里读取技能，装完它们也能
+  用上视觉。（全局级安装不写这个文件。）
 
 ## 端点参考
 
@@ -190,12 +194,17 @@ npx deepseek-vl-support@latest config set maxBytes 5242880
 
 ```bash
 npx deepseek-vl-support@latest install --non-interactive \
-  --target both --preset custom \
+  --target claude,codex --preset custom \
   --base-url https://api.moonshot.cn/v1 --model moonshot-v1-32k-vision-preview \
   --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
 ```
 
-## Agent Plugins 模式（Copilot / Cursor / Kiro / OpenClaw / Hermes）
+`--target` 接受逗号分隔的 agent 列表（`claude`、`codex`、`copilot`、`cursor`、
+`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、
+`other`），默认 `claude,codex`。任意组合都支持——例如
+`--target claude,copilot` 一次运行同时装好 Claude Code 钩子并注册 Copilot 插件。
+
+## Agent Plugins 模式（10 个兼容客户端）
 
 除了 Claude Code 和 Codex，本包还以 [Agent Plugins v1.0.0](https://agent-plugins.org)
 可移植插件的形式发布（仓库根目录 `plugin.json` + `mcp.json` +
@@ -208,12 +217,16 @@ npx deepseek-vl-support@latest install --non-interactive \
 
 ```bash
 # 一键安装：把插件目录复制到 ~/.deepseek-vl/plugin/ 并注册到所选客户端
-#（菜单默认勾选检测到的客户端）
-npx deepseek-vl-support@latest install --target plugin
+#（向导菜单默认勾选检测到的客户端）
+npx deepseek-vl-support@latest install --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other
 
-# 非交互：用 --clients 明确指定客户端（默认全部）
-npx deepseek-vl-support@latest install --target plugin --clients copilot,cursor
+# 非交互：同样效果，也可以把插件 agent 与原生 agent 混装
+npx deepseek-vl-support@latest install --target claude,copilot
 ```
+
+旧版 `--clients copilot,cursor` 参数仍然可用，作为非交互安装中插件 agent 的过滤器
+（生效的插件 agent = `--target ∩ --clients`）；`--target plugin` 已移除——直接列出
+插件 agent 即可。
 
 各客户端行为：
 
@@ -224,21 +237,32 @@ npx deepseek-vl-support@latest install --target plugin --clients copilot,cursor
 | Kiro | 手动——Kiro 没有命令行自动化入口 | Kiro → Powers 面板 → Add Custom Power → Import power from a folder → 选择 `~/.deepseek-vl/plugin` | 同一面板移除该 power |
 | OpenClaw | `openclaw plugins install ~/.deepseek-vl/plugin` + `openclaw gateway restart` | `openclaw plugins list`，然后让它描述截图 | `openclaw plugins uninstall deepseek-vl-support` |
 | Hermes Agent | `hermes plugins install limccn/deepseek-vl-support --no-enable` + `hermes plugins enable deepseek-vl-support` | `hermes plugins list`，确认技能可被发现 | `hermes plugins uninstall deepseek-vl-support` |
+| VS Code | 无需 CLI——在用户 `settings.json` 里写入 `chat.pluginLocations["~/.deepseek-vl/plugin"] = true`（首次修改会备份为 `.bak`） | 重载窗口后技能 / MCP 服务器出现 | 安装器的卸载只删除我们的 `chat.pluginLocations` 条目 |
+| ChatGPT & Codex | 本地 marketplace 垫片放在 `~/.deepseek-vl/marketplace/` + `codex plugin marketplace add` + `codex plugin add deepseek-vl-support@deepseek-vl-support`（没有 `codex` CLI 时改为指引） | 新开一个 Codex 线程（或 ChatGPT 会话），技能 / MCP 工具即可加载 | `codex plugin remove deepseek-vl-support@deepseek-vl-support`（marketplace 注册保留） |
+| Grok Bot | `grok plugin install ~/.deepseek-vl/plugin --trust`（没有 `grok` CLI 时改为指引） | 在 Plugins 页按 `r` 或新开会话；用 `grok inspect` 验证 MCP 工具 | `grok plugin uninstall deepseek-vl-support --confirm` |
+| NanoClaw | 复制插件到 `~/.deepseek-vl/nanoclaw-templates/`（NanoClaw 拒绝符号链接——永远用复制）+ `ncl groups create --template deepseek-vl-support --name "DeepSeek Vision"`（没有 `ncl` CLI 时改为指引） | 印章（stamping）不会自动接线通道——需运行 `ncl wirings create`；任务默认暂停 | 手动——NanoClaw 没有插件卸载（删除印章组即可） |
+| Other（任意兼容 Agent Plugins 标准的智能体） | 物化插件目录并打印 Agent Plugins 开放标准的通用安装指引 | 见打印出的指引 | 手动——按安装时的步骤反向操作 |
+
+`chatgpt-codex` 是原生 `codex` 目标的插件模式对应物（MCP 配置 + AGENTS.md）：
+想让 Codex 在所有上下文里都能看图，可以两个都装。marketplace 垫片位于物化插件
+目录**之外**（`~/.deepseek-vl/marketplace/`，不是 `~/.deepseek-vl/plugin/`），
+物化目录始终保持恰好四个规范条目。
 
 单个客户端失败不会阻塞其他客户端——安装器逐客户端报告并给出指引（失败通常只是
 「重启应用」或一条手动命令）。
 
-插件客户端的配置是**环境变量或全局级别**：`install --target plugin` 总是写入
-`~/.deepseek-vl/config.json`（没有项目/全局选择），客户端启动的 MCP 子进程能看到
-`VISION_*` 环境变量。项目级 `.deepseek-vl/config.json` 对它们不可见——请用
-`npx deepseek-vl-support@latest config set <key> <value> --global` 或
+插件客户端的配置是**环境变量或全局级别**：只要安装包含插件 agent，就会写入
+`~/.deepseek-vl/config.json`（插件 agent 没有项目/全局选择——例如 `claude,copilot`
+混合安装时 Claude 钩子按项目作用域安装，但端点配置写全局），客户端启动的 MCP
+子进程能看到 `VISION_*` 环境变量。项目级 `.deepseek-vl/config.json` 对它们不可见——
+请用 `npx deepseek-vl-support@latest config set <key> <value> --global` 或
 `VISION_BASE_URL` / `VISION_MODEL` / `VISION_API_KEY`。
 
 卸载会撤销注册并保留已物化的插件目录：
 
 ```bash
-npx deepseek-vl-support@latest uninstall --target plugin              # 保留配置
-npx deepseek-vl-support@latest uninstall --target plugin --purge-config   # 连同配置/缓存一起删除
+npx deepseek-vl-support@latest uninstall --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other   # 保留配置
+npx deepseek-vl-support@latest uninstall --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other --purge-config   # 连同配置/缓存一起删除
 ```
 
 ## 开发者

@@ -60,7 +60,7 @@ just press Enter to accept it.**
 
 | # | Question | What it means | Default |
 |---|---|---|---|
-| 1 | Which tool to enhance? | The AI tool you use: `claude` / `codex` / `both` | both |
+| 1 | Which agents should get vision? | Pick one or more (comma-separated numbers): `claude`, `codex`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other` — plugin clients not found on this machine are flagged "not detected" (manual instructions) | claude, codex + detected plugin clients |
 | 2 | Vision endpoint preset | Which "eyes provider" to use — pick the one you have an account for (see the endpoint table below) | openrouter |
 | 3 | Base URL | The address of that service (the preset fills this in) | from preset |
 | 4 | API key | Your secret code for that service; stored only on your computer | Enter skips |
@@ -106,7 +106,10 @@ From then on:
   `/vision path/to/picture.png "your question"`.
 - **Codex**: ask the model to call `mcp__deepseek-vl__describe_image(path)`;
   `mcp__deepseek-vl__vision_status()` shows the current settings plus a health
-  check.
+  check. A **project-scope** Codex install additionally writes the skill to
+  `.agents/skills/deepseek-vision/SKILL.md` in the project — the Codex skill
+  contract location that Cursor, GitHub Copilot, Kimi Code, etc. read skills
+  from, so those tools pick up vision too. (Global-scope installs skip it.)
 
 ## Choosing the endpoint (reference)
 
@@ -200,12 +203,19 @@ Full settings example (`.deepseek-vl/config.json`, editable via
 
 ```bash
 npx deepseek-vl-support@latest install --non-interactive \
-  --target both --preset custom \
+  --target claude,codex --preset custom \
   --base-url https://api.moonshot.cn/v1 --model moonshot-v1-32k-vision-preview \
   --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
 ```
 
-## Agent Plugins mode (Copilot / Cursor / Kiro / OpenClaw / Hermes)
+`--target` takes a comma-separated agent list
+(`claude`, `codex`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`,
+`vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`);
+the default is `claude,codex`. Any combination is allowed — e.g.
+`--target claude,copilot` installs the Claude Code hook AND registers the
+plugin with Copilot in one run.
+
+## Agent Plugins mode (10 compatible clients)
 
 Beyond Claude Code and Codex, the package ships as a portable
 [Agent Plugins v1.0.0](https://agent-plugins.org) package (root `plugin.json`
@@ -218,13 +228,18 @@ config is shipped for Copilot's native MCP convention.
 
 ```bash
 # one-shot installer: copies the plugin dir to ~/.deepseek-vl/plugin/ and
-# registers it with the clients you pick (menu defaults to the clients it
-# detects on your machine)
-npx deepseek-vl-support@latest install --target plugin
+# registers it with the clients you pick (the wizard menu defaults to the
+# clients it detects on your machine)
+npx deepseek-vl-support@latest install --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other
 
-# non-interactive: choose clients explicitly with --clients (default: all)
-npx deepseek-vl-support@latest install --target plugin --clients copilot,cursor
+# non-interactive: same effect, or mix plugin agents with native ones
+npx deepseek-vl-support@latest install --target claude,copilot
 ```
+
+The legacy `--clients copilot,cursor` flag still works as a filter for
+plugin agents in non-interactive runs (effective plugin agents =
+`--target ∩ --clients`); the old `--target plugin` value is gone — list the
+plugin agents directly instead.
 
 Per-client behavior:
 
@@ -235,14 +250,28 @@ Per-client behavior:
 | Kiro | manual — Kiro has no CLI automation surface | Kiro → Powers panel → Add Custom Power → Import power from a folder → select `~/.deepseek-vl/plugin` | same panel, remove the power |
 | OpenClaw | `openclaw plugins install ~/.deepseek-vl/plugin` + `openclaw gateway restart` | `openclaw plugins list`, then ask for a screenshot description | `openclaw plugins uninstall deepseek-vl-support` |
 | Hermes Agent | `hermes plugins install limccn/deepseek-vl-support --no-enable` + `hermes plugins enable deepseek-vl-support` | `hermes plugins list`, then check the skill is discoverable | `hermes plugins uninstall deepseek-vl-support` |
+| VS Code | no CLI needed — sets `chat.pluginLocations["~/.deepseek-vl/plugin"] = true` in the user `settings.json` (backed up to `.bak`) | reload the window, then the skill/MCP server shows up | installer's uninstall removes only our `chat.pluginLocations` entry |
+| ChatGPT & Codex | local marketplace shim at `~/.deepseek-vl/marketplace/` + `codex plugin marketplace add` + `codex plugin add deepseek-vl-support@deepseek-vl-support` (guidance instead when no `codex` CLI) | start a new Codex thread (or ChatGPT session), then the skill/MCP tools load | `codex plugin remove deepseek-vl-support@deepseek-vl-support` (marketplace registration kept) |
+| Grok Bot | `grok plugin install ~/.deepseek-vl/plugin --trust` (guidance instead when no `grok` CLI) | press `r` in the Plugins tab or start a new session; verify MCP tools with `grok inspect` | `grok plugin uninstall deepseek-vl-support --confirm` |
+| NanoClaw | copies the plugin to `~/.deepseek-vl/nanoclaw-templates/` (NanoClaw rejects symlinks — always a copy) + `ncl groups create --template deepseek-vl-support --name "DeepSeek Vision"` (guidance instead when no `ncl` CLI) | stamping does not wire a channel — run `ncl wirings create`; tasks start paused | manual — NanoClaw has no plugin uninstall (delete the stamped group) |
+| Other (any spec-compliant agent) | materializes the plugin dir and prints generic install guidance for the Agent Plugins open standard | see the printed guidance | manual — reverse whatever you did to install it |
+
+The `chatgpt-codex` entry is the plugin-mode counterpart of the native
+`codex` target (MCP config + AGENTS.md): install both if you want Codex to
+see vision in every context. The marketplace shim lives OUTSIDE the
+materialized plugin dir (`~/.deepseek-vl/marketplace/`, not
+`~/.deepseek-vl/plugin/`), so the materialized dir keeps exactly its four
+spec entries.
 
 One client failing never blocks the others — the installer reports each client
 separately with guidance (a failed client is usually just "restart the app" or
 a manual command to run).
 
-Configuration for the plugin clients is **environment or global level**:
-`install --target plugin` always writes `~/.deepseek-vl/config.json` (there is
-no project/global choice), and the MCP subprocesses the clients start see
+Configuration for the plugin clients is **environment or global level**: any
+install that includes a plugin agent writes `~/.deepseek-vl/config.json`
+(there is no project/global choice for them — e.g. a mixed
+`claude,copilot` run installs the Claude hook project-scope but writes the
+endpoint config globally), and the MCP subprocesses the clients start see
 `VISION_*` environment variables. A project-local `.deepseek-vl/config.json`
 is not visible to them — use `npx deepseek-vl-support@latest config set
 <key> <value> --global` or `VISION_BASE_URL` / `VISION_MODEL` /
@@ -251,8 +280,8 @@ is not visible to them — use `npx deepseek-vl-support@latest config set
 Uninstall reverses the registration and keeps the materialized plugin dir:
 
 ```bash
-npx deepseek-vl-support@latest uninstall --target plugin              # keep config
-npx deepseek-vl-support@latest uninstall --target plugin --purge-config   # + delete config/cache
+npx deepseek-vl-support@latest uninstall --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other   # keep config
+npx deepseek-vl-support@latest uninstall --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other --purge-config   # + delete config/cache
 ```
 
 ## For developers

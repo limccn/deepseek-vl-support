@@ -3,12 +3,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { configPaths, writeConfigFile } from "../src/config.ts";
+import { vscodeUserSettingsPath } from "../src/plugin.ts";
 import { startMockVisionServer } from "./mock-vision-server.ts";
 import type { MockVisionServer } from "./mock-vision-server.ts";
 import { makeFakePng } from "./mock-vision-server.ts";
@@ -219,6 +220,111 @@ test("non-interactive install + uninstall via the CLI surface", async () => {
       assert.equal(un.code, 0);
       assert.ok(!existsSync(join(project, ".claude", "hooks", "deepseek-vision-hook.cjs")));
       assert.ok(existsSync(join(project, ".deepseek-vl", "config.json")), "config kept by default");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("--target rejects removed values (both/plugin) and unknown names with a clear error; comma lists accepted", async () => {
+  const { base, project, home } = await makeEnv();
+  try {
+    const both = await runCli(project, home, ["install", "--non-interactive", "--target", "both", "--dry-run"]);
+    assert.equal(both.code, 1);
+    assert.match(both.stderr, /invalid target: "both"/);
+    assert.match(both.stderr, /claude,codex,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/, "error must list the valid agents");
+
+    const plugin = await runCli(project, home, ["uninstall", "--target", "plugin"]);
+    assert.equal(plugin.code, 1);
+    assert.match(plugin.stderr, /invalid target: "plugin"/);
+
+    const bogus = await runCli(project, home, ["install", "--target", "bogus"]);
+    assert.equal(bogus.code, 1);
+    assert.match(bogus.stderr, /invalid target: "bogus"/);
+
+    const mixed = await runCli(project, home, ["install", "--target", "claude,bogus"]);
+    assert.equal(mixed.code, 1);
+    assert.match(mixed.stderr, /invalid target: "bogus"/);
+
+    // comma-separated agent list accepted (dry-run, nothing written)
+    const ok = await runCli(project, home, ["install", "--target", "claude,copilot", "--dry-run"]);
+    assert.equal(ok.code, 0, `stderr: ${ok.stderr}`);
+    assert.ok(!existsSync(join(project, ".deepseek-vl")), "dry-run writes nothing");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("--target vscode,grok,other round-trip via the CLI (PATH isolated from real CLIs)", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      // fake VS Code user settings dir so the vscode target takes the
+      // settings-write path (not the not-detected guidance path)
+      mkdirSync(join(vscodeUserSettingsPath(home), ".."), { recursive: true });
+
+      // isolate PATH so no real grok/codex/ncl/code CLI can be executed
+      const emptyBin = join(base, "emptybin");
+      mkdirSync(emptyBin, { recursive: true });
+      const savedPath = process.env.PATH;
+      process.env.PATH = emptyBin;
+      try {
+        const ins = await runCli(project, home, [
+          "install", "--non-interactive", "--target", "vscode,grok,other",
+          "--base-url", mock.url, "--model", "qwen2.5vl:7b",
+        ]);
+        assert.equal(ins.code, 0, `install exit 0, stderr: ${ins.stderr}`);
+        assert.match(ins.stdout, /\[vscode\] ok/, `vscode ok: ${ins.stdout}`);
+        assert.match(ins.stdout, /\[grok\] manual/, `grok guidance line: ${ins.stdout}`);
+        assert.match(ins.stdout, /\[other\] manual/, `other guidance line: ${ins.stdout}`);
+        assert.ok(existsSync(join(home, ".deepseek-vl", "plugin", "plugin.json")), "plugin dir materialized");
+        const settings = JSON.parse(readFileSync(vscodeUserSettingsPath(home), "utf8")) as Record<string, unknown>;
+        const locs = ((settings.chat as Record<string, unknown> | undefined)?.pluginLocations ?? {}) as Record<string, unknown>;
+        assert.ok(Object.keys(locs).some((k) => k.includes(".deepseek-vl")), "vscode entry present");
+
+        const un = await runCli(project, home, ["uninstall", "--target", "vscode,grok,other"]);
+        assert.equal(un.code, 0, `uninstall exit 0, stderr: ${un.stderr}`);
+        const after = JSON.parse(readFileSync(vscodeUserSettingsPath(home), "utf8")) as Record<string, unknown>;
+        const locsAfter = ((after.chat as Record<string, unknown> | undefined)?.pluginLocations ?? {}) as Record<string, unknown>;
+        assert.ok(!Object.keys(locsAfter).some((k) => k.includes(".deepseek-vl")), "our vscode entry removed");
+        assert.ok(existsSync(join(home, ".deepseek-vl", "plugin", "plugin.json")), "materialized dir kept without --purge-config");
+      } finally {
+        process.env.PATH = savedPath;
+      }
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("mixed --target claude,kiro install + uninstall round-trip via the CLI", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const ins = await runCli(project, home, [
+        "install", "--non-interactive", "--target", "claude,kiro",
+        "--base-url", mock.url, "--model", "qwen2.5vl:7b",
+      ]);
+      assert.equal(ins.code, 0, `install exit 0, stderr: ${ins.stderr}`);
+      // claude native artifacts in the project
+      assert.ok(existsSync(join(project, ".claude", "hooks", "deepseek-vision-hook.cjs")));
+      // plugin dir materialized + endpoint config GLOBAL (plugin agent present)
+      assert.ok(existsSync(join(home, ".deepseek-vl", "plugin", "plugin.json")), "plugin dir materialized");
+      assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")));
+      assert.ok(!existsSync(join(project, ".deepseek-vl")), "no project config in a mixed run");
+      assert.match(ins.stdout, /\[claude\] ok/, `per-agent line missing: ${ins.stdout}`);
+      assert.match(ins.stdout, /\[kiro\] manual/, `kiro guidance line missing: ${ins.stdout}`);
+
+      const un = await runCli(project, home, ["uninstall", "--target", "claude,kiro"]);
+      assert.equal(un.code, 0);
+      assert.ok(!existsSync(join(project, ".claude", "hooks", "deepseek-vision-hook.cjs")));
+      assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")), "config kept by default");
     } finally {
       await rm(base, { recursive: true, force: true });
     }
