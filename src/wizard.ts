@@ -28,11 +28,11 @@ function makeRl() {
 function formatMenu(spec: MenuSpec): string {
   const lines = [spec.prompt];
   spec.options.forEach((opt, i) => {
-    const marker = opt.value === spec.default ? " (default 默认)" : "";
+    const marker = opt.value === spec.default ? " (default)" : "";
     lines.push(`  ${i + 1}) ${opt.label}${marker}`);
   });
   const def = spec.default ? ` [${spec.default}]` : "";
-  lines.push(`> 选择/select (1-${spec.options.length}${def}): `);
+  lines.push(`> Select (1-${spec.options.length}${def}): `);
   return lines.join("\n");
 }
 
@@ -47,7 +47,7 @@ export async function askMenu(spec: MenuSpec): Promise<string> {
       if (Number.isInteger(n) && n >= 1 && n <= spec.options.length) {
         return spec.options[n - 1].value;
       }
-      output.write(`Invalid choice. 输入无效，请重新选择。\n`);
+      output.write(`Invalid choice, please select again.\n`);
     }
   } finally {
     rl.close();
@@ -70,7 +70,7 @@ export async function askInput(spec: InputSpec): Promise<string> {
 /** Ask a hidden (masked) input. Falls back to plain input on non-TTY. */
 export async function askSecret(spec: InputSpec): Promise<string> {
   if (!input.isTTY || !output.isTTY) return askInput(spec);
-  const def = spec.default !== undefined ? ` [回车/Enter=默认]` : ` [回车/Enter=跳过]`;
+  const def = spec.default !== undefined ? ` [Enter=default]` : ` [Enter=skip]`;
   output.write(`${spec.prompt}${def}: `);
   return new Promise<string>((resolve) => {
     const stdin = input;

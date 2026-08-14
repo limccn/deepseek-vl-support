@@ -57,7 +57,7 @@ test("success: posts data URI with correct payload, returns text", async () => {
     await writeFile(img, makeFakePng());
 
     const res = await describe(img, { cwd: project, home });
-    assert.match(res.text, /mock 描述/);
+    assert.match(res.text, /mock description/);
     assert.equal(res.fromFallback, false);
 
     const req = mock.requests[0];
@@ -156,7 +156,7 @@ test("size guard: oversized file → VisionSizeError, zero requests", async () =
       () => describe(img, { cwd: project, home }),
       (e: unknown) => {
         assert.ok(e instanceof VisionSizeError);
-        assert.match((e as Error).message, /compress|压缩/);
+        assert.match((e as Error).message, /compress/i);
         assert.equal((e as VisionSizeError).fileSize, 2048);
         assert.equal((e as VisionSizeError).maxBytes, 100);
         return true;

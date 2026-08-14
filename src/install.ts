@@ -54,14 +54,14 @@ export interface Preset {
 
 // Preset order follows D2: remote APIs first, local endpoints last.
 export const PRESETS: Preset[] = [
-  { id: "openrouter", label: "OpenRouter (cloud 云端)", baseUrl: "https://openrouter.ai/api/v1", model: "qwen/qwen2.5-vl-72b-instruct" },
-  { id: "siliconflow", label: "SiliconFlow 硅基流动 (cloud 云端)", baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-VL-72B-Instruct" },
-  { id: "dashscope", label: "Aliyun DashScope 阿里云百炼 (cloud 云端)", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-vl-max" },
-  { id: "custom", label: "Custom 自定义", baseUrl: "", model: "" },
-  { id: "ollama", label: "Ollama (local 本地)", baseUrl: "http://localhost:11434/v1", model: "qwen2.5vl:7b" },
-  { id: "llamacpp", label: "llama.cpp (local 本地)", baseUrl: "http://localhost:8080/v1", model: "llava" },
-  { id: "vllm", label: "vLLM (local 本地)", baseUrl: "http://localhost:8000/v1", model: "deepseek-ai/deepseek-vl2" },
-  { id: "lmstudio", label: "LM Studio (local 本地)", baseUrl: "http://localhost:1234/v1", model: "qwen2.5-vl-7b-instruct" },
+  { id: "openrouter", label: "OpenRouter (cloud)", baseUrl: "https://openrouter.ai/api/v1", model: "qwen/qwen2.5-vl-72b-instruct" },
+  { id: "siliconflow", label: "SiliconFlow (cloud)", baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-VL-72B-Instruct" },
+  { id: "dashscope", label: "Aliyun DashScope (cloud)", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-vl-max" },
+  { id: "custom", label: "Custom", baseUrl: "", model: "" },
+  { id: "ollama", label: "Ollama (local)", baseUrl: "http://localhost:11434/v1", model: "qwen2.5vl:7b" },
+  { id: "llamacpp", label: "llama.cpp (local)", baseUrl: "http://localhost:8080/v1", model: "llava" },
+  { id: "vllm", label: "vLLM (local)", baseUrl: "http://localhost:8000/v1", model: "deepseek-ai/deepseek-vl2" },
+  { id: "lmstudio", label: "LM Studio (local)", baseUrl: "http://localhost:1234/v1", model: "qwen2.5-vl-7b-instruct" },
 ];
 
 export function presetById(id: string): Preset | undefined {
@@ -134,50 +134,50 @@ async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.Proce
   const presetSeed = seed.preset ? presetById(seed.preset) : undefined;
 
   const target = (await askMenu({
-    prompt: "Which tool to enhance? 为哪个工具安装视觉增强？",
+    prompt: "Which tool to enhance?",
     options: [
-      { value: "claude", label: "Claude Code (hooks 自动拦截 Read)" },
-      { value: "codex", label: "Codex (MCP 工具，需 Agent 主动调用)" },
-      { value: "both", label: "Both 两者" },
+      { value: "claude", label: "Claude Code (hooks intercept Read automatically)" },
+      { value: "codex", label: "Codex (MCP tool, invoked by the agent)" },
+      { value: "both", label: "Both" },
     ],
     default: seed.target ?? env.DVLS_TARGET ?? "both",
   })) as InstallTarget;
 
   const presetId = await askMenu({
-    prompt: "Vision endpoint preset 视觉端点预设：",
+    prompt: "Vision endpoint preset",
     options: PRESETS.map((p) => ({ value: p.id, label: p.label })),
     default: presetSeed?.id ?? env.DVLS_PRESET ?? "openrouter",
   });
   const preset = presetById(presetId);
 
   const baseUrl = await askInput({
-    prompt: "Base URL (OpenAI-compatible, ends with /v1) 端点地址",
+    prompt: "Base URL (OpenAI-compatible, ends with /v1)",
     hint: "e.g. " + (preset?.baseUrl || "http://localhost:11434/v1"),
     default: seed.baseUrl ?? env.VISION_BASE_URL ?? preset?.baseUrl ?? DEFAULT_BASE_URL,
   });
 
   const apiKey = await askSecret({
-    prompt: "API key (Enter to skip 回车跳过; stored in .deepseek-vl/config.json)",
+    prompt: "API key (Enter to skip; stored in .deepseek-vl/config.json)",
     default: seed.apiKey ?? env.VISION_API_KEY ?? "",
   });
 
   const model = await askInput({
-    prompt: "Vision model id 视觉模型",
+    prompt: "Vision model id",
     hint: "e.g. " + (preset?.model || "qwen2.5vl:7b"),
     default: seed.model ?? env.VISION_MODEL ?? preset?.model ?? "",
   });
 
   const fallbackRaw = await askInput({
-    prompt: "Fallback models (Enter to skip 回车跳过; format: model@baseUrl, model2)",
+    prompt: "Fallback models (Enter to skip; format: model@baseUrl, model2)",
     hint: "or JSON [{\"model\":\"...\",\"baseUrl\":\"...\"}]",
     default: "",
   });
 
   const global = (await askMenu({
-    prompt: "Install scope 安装作用域：",
+    prompt: "Install scope",
     options: [
-      { value: "project", label: "Project 项目级 (.claude/ .codex/ in this directory)" },
-      { value: "global", label: "Global 全局 (~/.claude ~/.codex)" },
+      { value: "project", label: "Project (.claude/ .codex/ in this directory)" },
+      { value: "global", label: "Global (~/.claude ~/.codex)" },
     ],
     default: seed.global ? "global" : "project",
   })) === "global";
@@ -215,11 +215,11 @@ function writeManagedFile(
   if (existsSync(target)) {
     const existing = readTextFile(target) ?? "";
     if (!existing.includes(opts.marker)) {
-      warnings.push(`skip ${target}: exists without our marker (user-authored). 已存在且不含本工具标记（用户自写），跳过不覆盖。`);
+      warnings.push(`skip ${target}: exists without our marker (user-authored).`);
       return;
     }
     if (!opts.update) {
-      log(`exists (managed) — keep, use --update to refresh. 已存在（本工具产物），保留；--update 可覆盖更新。`);
+      log(`exists (managed) — keep, use --update to refresh.`);
       return;
     }
   }
@@ -347,7 +347,7 @@ async function installClaude(opts: InstallOptions, answers: InstallAnswers, repo
   const hookSource = readTextFile(packagedHookPath());
   if (hookSource === null) {
     report.warnings.push(
-      `missing ${packagedHookPath()} — run \`npm run build\` first. 缺少 hook 构建产物，请先执行 npm run build。`,
+      `missing ${packagedHookPath()} — run \`npm run build\` first.`,
     );
   } else {
     writeManagedFile(hookPath, hookSource, { update: opts.update, dryRun: opts.dryRun, marker: HOOK_MARKER }, log, report.warnings);
@@ -396,11 +396,11 @@ async function installClaude(opts: InstallOptions, answers: InstallAnswers, repo
         log(`merged hooks into ${settingsFile}${backup ? ` (backup: ${backup})` : ""}`);
       }
     } else {
-      log(`settings.json already contains our hook entries — idempotent, no change. 已包含本工具 hook 条目，无变更。`);
+      log(`settings.json already contains our hook entries — idempotent, no change.`);
     }
   }
 
-  log(`Claude Code: restart your session for hooks to take effect. 请重启会话使 hook 生效。`);
+  log(`Claude Code: restart your session for hooks to take effect.`);
 }
 
 async function installCodex(opts: InstallOptions, answers: InstallAnswers, report: InstallReport): Promise<void> {
@@ -419,13 +419,13 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
     log(
       r1.changed
         ? `added [mcp_servers.${MCP_SERVER_NAME}] to ${configToml} (npx -y ${PKG_NAME}@${version} mcp, tool_timeout_sec=180)${r1.backup ? ` (backup: ${r1.backup})` : ""}`
-        : `config.toml already has [mcp_servers.${MCP_SERVER_NAME}] — idempotent, no change. 已存在，无变更。`,
+        : `config.toml already has [mcp_servers.${MCP_SERVER_NAME}] — idempotent, no change.`,
     );
     const r2 = upsertAgentsBlock(agentsFile);
     log(
       r2.changed
         ? `${AGENTS_START_MARKER} block written to ${agentsFile}${r2.backup ? ` (backup: ${r2.backup})` : ""}`
-        : `AGENTS.md already has our block — idempotent, no change. 已包含本工具段，无变更。`,
+        : `AGENTS.md already has our block — idempotent, no change.`,
     );
   }
 
@@ -435,7 +435,7 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
     log(
       `models.json not found — MCP tools may be hidden by the DeepSeek models.json bug. ` +
         `If "mcp__deepseek-vl__*" tools are invisible, fix ~/.codex/models.json: set "supports_search_tool": false. ` +
-        `未找到 models.json；若 MCP 工具不可见，请将 models.json 中 DeepSeek 条目的 supports_search_tool 改为 false。`,
+        `models.json not found; if MCP tools are not visible, set supports_search_tool to false for the DeepSeek entry in models.json.`,
     );
   } else if (opts.dryRun) {
     log(`[dry-run] would check/fix ${modelsPath} (supports_search_tool)`);
@@ -453,10 +453,10 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
   const toml = readTextFile(configToml);
   if (toml !== null && !toml.includes("wire_api")) {
     report.warnings.push(
-      `hint: if you use DeepSeek with Codex, ensure your [model_providers.deepseek] section has \`wire_api = "chat"\` and a non-reasoning model (v4-r1/reasoning models do not support function calling). 提示：Codex + DeepSeek 需 wire_api="chat"，且不能使用推理模型。`,
+      `hint: if you use DeepSeek with Codex, ensure your [model_providers.deepseek] section has \`wire_api = "chat"\` and a non-reasoning model (v4-r1/reasoning models do not support function calling).`,
     );
   }
-  log(`Codex: restart your Codex session; verify with \`codex mcp list\`. 请重启 Codex 会话，并用 codex mcp list 验证。`);
+  log(`Codex: restart your Codex session; verify with \`codex mcp list\`.`);
 }
 
 export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
@@ -471,7 +471,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   const configDir = answers.global ? globalConfigDir(home) : join(opts.cwd, CONFIG_DIR);
   const configFile = join(configDir, "config.json");
 
-  log(`deepseek-vl-support installer 安装器 (target: ${answers.target}, scope: ${answers.global ? "global 全局" : "project 项目"})`);
+  log(`deepseek-vl-support installer (target: ${answers.target}, scope: ${answers.global ? "global" : "project"})`);
 
   // 1) config.json (deep-merge write)
   if (opts.dryRun) {
@@ -483,7 +483,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
       apiKey: answers.apiKey,
       fallbacks: answers.fallbacks,
     });
-    log(`config written 配置已写入: ${configFile}${merged.model ? "" : " (model 未设置!)"}`);
+    log(`config written: ${configFile}${merged.model ? "" : " (model not set!)"}`);
   }
 
   // 2) .gitignore (project scope only — protects the API key from git)
@@ -491,9 +491,9 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
     if (opts.dryRun) {
       log(`[dry-run] would append "${GITIGNORE_ENTRY}" to ${join(opts.cwd, ".gitignore")}`);
     } else if (upsertGitignore(opts.cwd, GITIGNORE_ENTRY)) {
-      log(`appended "${GITIGNORE_ENTRY}" to .gitignore (config + cache stay out of git) 已追加到 .gitignore`);
+      log(`appended "${GITIGNORE_ENTRY}" to .gitignore (config + cache stay out of git)`);
     } else {
-      log(`.gitignore already contains "${GITIGNORE_ENTRY}" 已存在，无变更`);
+      log(`.gitignore already contains "${GITIGNORE_ENTRY}"`);
     }
   }
 
@@ -502,7 +502,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   if (answers.target === "codex" || answers.target === "both") await installCodex(opts, answers, report);
 
   // 4) doctor self-check
-  log(`-- doctor self-check 自检 --`);
+  log(`-- doctor self-check --`);
   if (opts.dryRun) {
     log(`[dry-run] (doctor skipped)`);
   } else {
@@ -511,7 +511,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
     report.output.push(...doctor.lines);
     if (!doctor.ok) {
       report.warnings.push(
-        `doctor found problems (see above). Run \`npx deepseek-vl-support doctor\` after fixing. 自检发现问题，请修复后重试 doctor。`,
+        `doctor found problems (see above). Run \`npx deepseek-vl-support doctor\` after fixing.`,
       );
     }
   }
@@ -528,12 +528,12 @@ function removeFileIfManaged(
   opts: { dryRun?: boolean },
 ): void {
   if (!existsSync(target)) {
-    report.output.push(`skip (not found 不存在): ${target}`);
+    report.output.push(`skip (not found): ${target}`);
     return;
   }
   const content = readTextFile(target) ?? "";
   if (!content.includes(marker)) {
-    report.skipped.push(`${target} (exists without our marker 不含本工具标记, user-authored, kept 保留)`);
+    report.skipped.push(`${target} (exists without our marker, user-authored, kept)`);
     return;
   }
   if (opts.dryRun) {
@@ -566,10 +566,10 @@ async function uninstallClaude(opts: UninstallOptions, report: UninstallReport, 
         log(`removed ${removed} hook entry(ies) from ${settingsFile}`);
       }
     } else {
-      log(`no deepseek-vl-support hook entries in ${settingsFile} 未找到本工具 hook 条目`);
+      log(`no deepseek-vl-support hook entries in ${settingsFile}`);
     }
   } else if (existsSync(settingsFile)) {
-    log(`settings.json invalid JSON — left untouched. 不是合法 JSON，未做修改: ${settingsFile}`);
+    log(`settings.json invalid JSON — left untouched: ${settingsFile}`);
   }
 
   removeFileIfManaged(join(hooksDir, HOOK_FILENAME), HOOK_MARKER, report, opts);
@@ -641,18 +641,18 @@ async function uninstallCodex(opts: UninstallOptions, report: UninstallReport, l
       report.removed.push(`${configToml} ([mcp_servers.${MCP_SERVER_NAME}] section)${r1.backup ? `, backup ${r1.backup}` : ""}`);
       log(`removed [mcp_servers.${MCP_SERVER_NAME}] section from ${configToml}`);
     } else {
-      log(`no [mcp_servers.${MCP_SERVER_NAME}] section in ${configToml} 未找到`);
+      log(`no [mcp_servers.${MCP_SERVER_NAME}] section in ${configToml}`);
     }
     const r2 = removeAgentsBlock(agentsFile);
     if (r2.changed) {
       report.removed.push(`${agentsFile} (AGENTS.md block)${r2.backup ? `, backup ${r2.backup}` : ""}`);
       log(`removed AGENTS.md block from ${agentsFile}`);
     } else {
-      log(`no deepseek-vl-support block in ${agentsFile} 未找到标记段`);
+      log(`no deepseek-vl-support block in ${agentsFile}`);
     }
   }
   report.kept.push(
-    `models.json fixes are NOT reverted automatically (they are safe/helpful). 未自动还原 models.json 修改（该修改无害且有帮助）。`,
+    `models.json fixes are NOT reverted automatically (they are safe/helpful).`,
   );
 }
 
@@ -662,7 +662,7 @@ export async function runUninstall(opts: UninstallOptions): Promise<UninstallRep
   const target = opts.target ?? "both";
   const home = opts.home ?? homedir();
 
-  log(`deepseek-vl-support uninstaller 卸载器 (target: ${target}, scope: ${opts.global ? "global 全局" : "project 项目"})`);
+  log(`deepseek-vl-support uninstaller (target: ${target}, scope: ${opts.global ? "global" : "project"})`);
 
   if (target === "claude" || target === "both") await uninstallClaude(opts, report, log);
   if (target === "codex" || target === "both") await uninstallCodex(opts, report, log);
@@ -679,16 +679,16 @@ export async function runUninstall(opts: UninstallOptions): Promise<UninstallRep
     } else if (existsSync(configDir)) {
       rmSync(configDir, { recursive: true, force: true });
       report.removed.push(configDir);
-      log(`deleted ${configDir} (--purge-config) 已删除配置与缓存`);
+      log(`deleted ${configDir} (--purge-config)`);
     } else {
-      log(`no ${configDir} 不存在`);
+      log(`no ${configDir}`);
     }
   } else {
-    report.kept.push(`${configDir} (config.json + cache kept 保留；--purge-config 可删除)`);
-    log(`config + cache kept 配置与缓存保留 (use --purge-config to delete 加 --purge-config 删除)`);
+    report.kept.push(`${configDir} (config.json + cache kept; --purge-config deletes it)`);
+    log(`config + cache kept (use --purge-config to delete)`);
   }
 
-  report.kept.push(`backups (.bak) kept for manual rollback. 备份文件（.bak）保留，可人工回滚。`);
+  report.kept.push(`backups (.bak) kept for manual rollback.`);
   report.skipped.forEach((s) => report.output.push(`[SKIP] ${s}`));
   report.removed.forEach((r) => report.output.push(`[REMOVED] ${r}`));
   report.kept.forEach((k) => report.output.push(`[KEPT] ${k}`));

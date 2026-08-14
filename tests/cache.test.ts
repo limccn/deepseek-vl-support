@@ -57,11 +57,11 @@ test("cache file content is the description (plan-B file format)", async () => {
     const cache = new DescriptionCache(join(dir, "cache"));
     const st = await stat(img);
     const buf = await readFile(img);
-    await cache.set(img, st, buf, "m1", "[Vision of img.png]:\nhello 世界");
+    await cache.set(img, st, buf, "m1", "[Vision of img.png]:\nhello world");
     const files = await readdir(join(dir, "cache"));
     assert.equal(files.length, 1);
     const rec = JSON.parse(await readFile(join(dir, "cache", files[0]), "utf8"));
-    assert.equal(rec.text, "[Vision of img.png]:\nhello 世界");
+    assert.equal(rec.text, "[Vision of img.png]:\nhello world");
     assert.equal(rec.model, "m1");
     assert.equal(rec.sha256 ? typeof rec.sha256 : typeof rec.key, "string");
   } finally {

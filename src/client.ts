@@ -16,8 +16,7 @@ export class VisionSizeError extends Error {
   constructor(fileSize: number, maxBytes: number) {
     super(
       `image too large: ${fileSize} bytes exceeds maxBytes=${maxBytes}. ` +
-        `Compress or crop it first (e.g. under 5 MB, ~2000px on the long edge). ` +
-        `图片过大：超过限制 ${maxBytes} 字节，请先压缩或裁剪（如 5 MB 以内、长边约 2000px）。`,
+        `Compress or crop it first (e.g. under 5 MB, ~2000px on the long edge).`,
     );
     this.name = "VisionSizeError";
     this.fileSize = fileSize;
@@ -117,7 +116,7 @@ async function postChat(
   const text = (out as { choices?: Array<{ message?: { content?: unknown } }> })
     ?.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) {
-    throw new Error("empty response - does the model support images? 空响应——该模型是否支持图片输入？");
+    throw new Error("empty response - does the model support images?");
   }
   return text.trim();
 }
@@ -158,7 +157,7 @@ export async function describe(
     const warn = opts.warn ?? ((m: string) => process.stderr.write(m + "\n"));
     warn(
       `[deepseek-vl-support] ${basename(abs)} is ${st.size} bytes (>2MB): remote vision API ` +
-        `may be slow and costly. 图片超过 2MB，远程视觉接口可能较慢且费用较高。`,
+        `may be slow and costly.`,
     );
   }
 
@@ -193,7 +192,7 @@ export async function describe(
 
   const failures: AttemptFailure[] = [];
   const systemPrompt = resolveSystemPrompt(cwd, home);
-  const question = opts.question?.trim() || "Describe this image very precisely (text, UI, code, visible errors). 请非常精确地描述这张图片（文字、界面、代码、可见错误）。";
+  const question = opts.question?.trim() || "Describe this image very precisely (text, UI, code, visible errors).";
 
   for (let i = 0; i < attempts.length; i++) {
     const a = attempts[i];
@@ -222,7 +221,7 @@ export async function describe(
     .join("\n");
   throw new Error(
     `vision failed on all ${failures.length} attempt(s):\n${chain}\n` +
-      `Run \`npx deepseek-vl-support doctor\` for diagnosis. 视觉调用全部失败，请运行 doctor 诊断。`,
+      `Run \`npx deepseek-vl-support doctor\` for diagnosis.`,
   );
 }
 

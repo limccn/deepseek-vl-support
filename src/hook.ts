@@ -89,7 +89,7 @@ async function handleRead(input: Record<string, unknown>): Promise<void> {
 
   const cfg = resolveConfig(cwd);
   if (!cfg.enabled || !cfg.model) {
-    log(`vision disabled or VISION_MODEL not set — no-op. 视觉未配置，跳过。`);
+    log(`vision disabled or VISION_MODEL not set — no-op.`);
     noop();
     return;
   }
@@ -104,7 +104,7 @@ async function handleRead(input: Record<string, unknown>): Promise<void> {
   if (st.size > cfg.maxBytes) {
     log(
       `${basename(filePath)} is ${st.size} bytes > maxBytes=${cfg.maxBytes}. ` +
-        `Not describing. Compress/crop it first. 图片过大，跳过描述：请先压缩或裁剪（如 5MB 以内、长边约 2000px）。`,
+        `Not describing. Compress/crop it first.`,
     );
     noop();
     return;
@@ -155,10 +155,10 @@ async function handleStart(input: Record<string, unknown>): Promise<void> {
     return;
   }
   const warning =
-    `[deepseek-vl-support] Vision not configured correctly — 视觉未正确配置\n` +
+    `[deepseek-vl-support] Vision not configured correctly\n` +
     problems.map((p) => `- ${p}`).join("\n") +
     `\nRun \`npx deepseek-vl-support doctor\` for details. ` +
-    `Images will NOT be described automatically. 图片将不会被自动描述。`;
+    `Images will NOT be described automatically.`;
   output({
     hookSpecificOutput: {
       hookEventName: "SessionStart",

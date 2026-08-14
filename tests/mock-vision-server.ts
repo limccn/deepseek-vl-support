@@ -25,7 +25,7 @@ export interface MockVisionServer {
 }
 
 const DEFAULT_CHAT = (): { status?: number; content?: string | null } => ({
-  content: "mock 描述：截图中有错误对话框与按钮。mock description with UI layout details.",
+  content: "mock description: screenshot with an error dialog and buttons, plus UI layout details.",
 });
 
 export function startMockVisionServer(opts: MockVisionOptions = {}): Promise<MockVisionServer> {

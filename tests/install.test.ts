@@ -158,7 +158,7 @@ test("re-install is idempotent: no duplicate entries, no change, hook kept", asy
       assert.equal(ours.length, 1, "no duplicate hook entries");
       assert.equal(text(join(project, ".claude", "settings.json")), settingsBefore, "settings.json unchanged on re-install");
       assert.equal(text(join(project, ".claude", "hooks", HOOK_FILENAME)), hookBefore, "hook not rewritten without --update");
-      assert.ok(report2.output.some((l) => l.includes("无变更")), `expected no-change log, got: ${report2.output.join("|")}`);
+      assert.ok(report2.output.some((l) => l.includes("idempotent")), `expected no-change log, got: ${report2.output.join("|")}`);
     } finally {
       await rm(base, { recursive: true, force: true });
     }
@@ -179,7 +179,7 @@ test("--update refreshes managed files; user-authored files are never overwritte
       const report = await installBoth(project, home, mock.url, { update: true });
       assert.equal(text(userSkill), "# My hand-written skill\n", "user-authored SKILL.md untouched");
       assert.ok(
-        report.warnings.some((w) => w.includes("user-authored") || w.includes("跳过")),
+        report.warnings.some((w) => w.includes("user-authored")),
         `expected skip warning, got: ${report.warnings.join("|")}`,
       );
 
@@ -310,7 +310,7 @@ test("codex install: MCP section + AGENTS.md block + models.json fix, preserving
       });
       assert.equal(text(join(codexDir, "config.toml")), beforeToml);
       assert.equal(text(join(codexDir, "AGENTS.md")), beforeAgents);
-      assert.ok(report2.output.some((l) => l.includes("无变更")));
+      assert.ok(report2.output.some((l) => l.includes("idempotent")));
     } finally {
       await rm(base, { recursive: true, force: true });
     }
@@ -434,7 +434,7 @@ test("uninstall removes managed artifacts, keeps config + user entries, preserve
       // second uninstall: no-op, no crash
       const report2 = await runUninstall({ cwd: project, home, target: "both" });
       assert.equal(report2.removed.length, 0);
-      assert.ok(report2.output.some((l) => l.includes("未找到")));
+      assert.ok(report2.output.some((l) => l.includes("no deepseek-vl-support hook entries")));
     } finally {
       await rm(base, { recursive: true, force: true });
     }

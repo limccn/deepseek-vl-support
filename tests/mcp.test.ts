@@ -171,7 +171,7 @@ test("describe_image returns the vision text and forwards the question", async (
       const r = res.result as { content: Array<{ type: string; text: string }>; isError: boolean };
       assert.equal(r.isError, false);
       assert.match(r.content[0].text, /\[Vision of shot\.png/);
-      assert.match(r.content[0].text, /mock 描述/);
+      assert.match(r.content[0].text, /mock description/);
       const body = mock.requests[0].body as { messages: Array<{ content: Array<{ text: string }> }> };
       assert.equal(body.messages[1].content[0].text, "What does the error say?");
     } finally {
@@ -197,9 +197,9 @@ test("describe_image caches: second call served from cache without an API reques
       const t1 = (r1.result as { content: Array<{ text: string }> }).content[0].text;
       const t2 = (r2.result as { content: Array<{ text: string }> }).content[0].text;
       assert.match(t1, /\(model: qwen2\.5vl:7b\)/);
-      assert.match(t2, /\(cached 缓存\)/);
-      assert.match(t1, /mock 描述/);
-      assert.match(t2, /mock 描述/);
+      assert.match(t2, /\(cached\)/);
+      assert.match(t1, /mock description/);
+      assert.match(t2, /mock description/);
       assert.equal(mock.requests.length, 1, "cache hit must not call the API");
     } finally {
       await client.close();

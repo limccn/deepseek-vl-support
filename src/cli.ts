@@ -115,7 +115,7 @@ async function cmdDescribe(args: ParsedArgs): Promise<void> {
     if (e instanceof VisionSizeError) {
       process.stderr.write(
         `[deepseek-vl-support] ${e.message}\n` +
-          `  hint: compress/crop the image, then retry. 请压缩或裁剪图片后重试。\n`,
+          `  hint: compress/crop the image, then retry.\n`,
       );
       process.exit(1);
     }
@@ -139,12 +139,12 @@ async function cmdDoctor(args: ParsedArgs): Promise<void> {
 function printConfig(cfg: VisionConfig): void {
   process.stdout.write(
     `baseUrl  : ${cfg.baseUrl}\n` +
-      `model    : ${cfg.model || "(not set 未设置)"}\n` +
+      `model    : ${cfg.model || "(not set)"}\n` +
       `apiKey   : ${maskApiKey(cfg.apiKey)}\n` +
       `timeoutMs: ${cfg.timeoutMs}\n` +
       `maxBytes : ${cfg.maxBytes} (${humanBytes(cfg.maxBytes)})\n` +
       `enabled  : ${cfg.enabled}\n` +
-      `fallbacks: ${cfg.fallbacks.length ? JSON.stringify(cfg.fallbacks) : "(none 无)"}\n`,
+      `fallbacks: ${cfg.fallbacks.length ? JSON.stringify(cfg.fallbacks) : "(none)"}\n`,
   );
 }
 

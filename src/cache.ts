@@ -5,8 +5,9 @@
 //
 // One record per sha: when a different model describes the same file the
 // record is overwritten. The old model then misses and re-fetches (design §5:
-// "换模型…自然失效，不跨模型复用描述" — descriptions are never reused across
-// models, and overwriting keeps the format a single human-readable record).
+// "switch model → natural invalidation, no cross-model reuse" — descriptions
+// are never reused across models, and overwriting keeps the format a single
+// human-readable record).
 //
 // The cache file content doubles as the "Plan B" description file format:
 // `[Vision of <path>]:\n<description>`.

@@ -206,7 +206,7 @@ export function fixModelsJson(modelsPath: string): ModelsJsonFixResult {
   const existing = readTextFile(modelsPath);
   const reason =
     "models.json bug (openai/codex#36382): `supports_search_tool: true` hides all MCP tools. " +
-    "Flattened to false for DeepSeek entries. models.json bug：supports_search_tool:true 会隐藏所有 MCP 工具，已改为 false。";
+    "Flattened to false for DeepSeek entries.";
   if (existing === null) return { changed: false, fixedEntries: [], reason };
   let data: unknown;
   try {

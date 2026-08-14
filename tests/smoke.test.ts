@@ -81,7 +81,7 @@ test("describe prints the vision text; --json emits structured output", async ()
     try {
       const plain = await runCli(project, home, ["describe", "shot.png"]);
       assert.equal(plain.code, 0);
-      assert.match(plain.stdout, /mock 描述/);
+      assert.match(plain.stdout, /mock description/);
 
       // fresh file → no cache hit → question must reach the API
       writeFileSync(join(project, "shot2.png"), makeFakePng());
@@ -95,7 +95,7 @@ test("describe prints the vision text; --json emits structured output", async ()
       const parsed = JSON.parse(j.stdout) as { text: string; model: string; fromFallback: boolean };
       assert.equal(parsed.model, "qwen2.5vl:7b");
       assert.equal(parsed.fromFallback, false);
-      assert.match(parsed.text, /mock 描述/);
+      assert.match(parsed.text, /mock description/);
     } finally {
       await rm(base, { recursive: true, force: true });
     }
@@ -157,7 +157,7 @@ test("doctor: exit 0 with healthy endpoint, exit 1 when unreachable", async () =
     try {
       const bad = await runCli(project, home, ["doctor"]);
       assert.equal(bad.code, 1, "doctor must exit 1 on unreachable endpoint");
-      assert.match(bad.stdout, /unreachable|不可达/);
+      assert.match(bad.stdout, /unreachable/);
     } finally {
       await rm(base, { recursive: true, force: true });
     }

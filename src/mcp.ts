@@ -44,11 +44,11 @@ function describeImageSchema() {
       path: {
         type: "string",
         description:
-          "Path to the image file (png/jpg/jpeg/gif/webp/bmp), absolute or relative to the session cwd. 图片文件路径（绝对或相对当前工作目录）。",
+          "Path to the image file (png/jpg/jpeg/gif/webp/bmp), absolute or relative to the session cwd.",
       },
       question: {
         type: "string",
-        description: "Optional question or focus for the description. 可选：提问或关注点。",
+        description: "Optional question or focus for the description.",
       },
     },
     required: ["path"],
@@ -62,7 +62,7 @@ function visionStatusSchema() {
 async function callDescribeImage(params: Record<string, unknown>): Promise<{ text: string; isError: boolean }> {
   const path = params.path;
   if (typeof path !== "string" || !path.trim()) {
-    return { text: "describe_image: missing required parameter `path`. 缺少必填参数 path。", isError: true };
+    return { text: "describe_image: missing required parameter `path`.", isError: true };
   }
   const abs = resolve(process.cwd(), path);
   const question = typeof params.question === "string" ? params.question : undefined;
@@ -71,7 +71,7 @@ async function callDescribeImage(params: Record<string, unknown>): Promise<{ tex
     return {
       text:
         res.fromCache
-          ? `[Vision of ${path} (cached 缓存)]:\n${res.text}`
+          ? `[Vision of ${path} (cached)]:\n${res.text}`
           : `[Vision of ${path} (model: ${res.model})]:\n${res.text}`,
       isError: false,
     };
@@ -86,37 +86,35 @@ async function callDescribeImage(params: Record<string, unknown>): Promise<{ tex
 async function callVisionStatus(): Promise<{ text: string; isError: boolean }> {
   const cfg = resolveConfig(process.cwd(), homedir());
   const lines = [
-    `[deepseek-vl-support] vision_status 视觉状态`,
+    `[deepseek-vl-support] vision_status`,
     `  enabled : ${cfg.enabled}`,
     `  baseUrl : ${cfg.baseUrl}`,
-    `  model   : ${cfg.model || "(not set 未设置)"}`,
+    `  model   : ${cfg.model || "(not set)"}`,
     `  apiKey  : ${maskApiKey(cfg.apiKey)}`,
     `  timeout : ${cfg.timeoutMs}ms`,
     `  maxBytes: ${humanBytes(cfg.maxBytes)}`,
-    `  fallbacks: ${cfg.fallbacks.length ? cfg.fallbacks.map((f) => f.model).join(", ") : "(none 无)"}`,
+    `  fallbacks: ${cfg.fallbacks.length ? cfg.fallbacks.map((f) => f.model).join(", ") : "(none)"}`,
   ];
   if (!cfg.enabled) {
-    lines.push(`  [SKIP] vision disabled (VISION_DISABLE / enabled:false) 视觉已禁用`);
+    lines.push(`  [SKIP] vision disabled (VISION_DISABLE / enabled:false)`);
     return { text: lines.join("\n"), isError: false };
   }
   if (!cfg.model) {
-    lines.push(`  [ERROR] VISION_MODEL not set 未配置视觉模型`);
+    lines.push(`  [ERROR] VISION_MODEL not set`);
     return { text: lines.join("\n"), isError: true };
   }
   try {
     const ids = await listModels(cfg.baseUrl, cfg.apiKey, 5000);
     if (ids === null) {
-      lines.push(`  [WARN] endpoint reachable but /models unavailable (404/405) 端点可达但无法列出模型`);
-      lines.push(`  [OK]  endpoint ${cfg.baseUrl} reachable 端点可达`);
+      lines.push(`  [WARN] endpoint reachable but /models unavailable (404/405)`);
+      lines.push(`  [OK]  endpoint ${cfg.baseUrl} reachable`);
     } else if (modelIdMatches(ids, cfg.model)) {
       lines.push(`  [OK] ${cfg.baseUrl} reachable, model "${cfg.model}" found (${ids.length} model(s))`);
-      lines.push(`  [OK] 端点可达，模型 "${cfg.model}" 已找到（共 ${ids.length} 个模型）`);
     } else {
       lines.push(`  [ERROR] model "${cfg.model}" NOT in /models list: ${ids.slice(0, 8).join(", ") || "(empty)"}`);
-      lines.push(`  [ERROR] 模型 "${cfg.model}" 不在 /models 列表中`);
     }
   } catch (e) {
-    lines.push(`  [ERROR] ${cfg.baseUrl} unreachable 不可达: ${e instanceof Error ? e.message : e}`);
+    lines.push(`  [ERROR] ${cfg.baseUrl} unreachable: ${e instanceof Error ? e.message : e}`);
   }
   return { text: lines.join("\n"), isError: false };
 }
@@ -145,13 +143,13 @@ async function handleRequest(req: JsonRpcRequest): Promise<void> {
         {
           name: "describe_image",
           description:
-            "Describe an image file with the configured vision model; returns detailed text (visible text, UI, colors, code, errors). 用配置的视觉模型描述图片文件，返回详细文本描述。",
+            "Describe an image file with the configured vision model; returns detailed text (visible text, UI, colors, code, errors).",
           inputSchema: describeImageSchema(),
         },
         {
           name: "vision_status",
           description:
-            "Vision configuration summary + endpoint health check (model visibility). 视觉配置摘要与端点健康检查。",
+            "Vision configuration summary + endpoint health check (model visibility).",
           inputSchema: visionStatusSchema(),
         },
       ],

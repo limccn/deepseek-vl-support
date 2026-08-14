@@ -137,7 +137,7 @@ test("image + healthy mock endpoint → block with additionalContext, single std
       assert.equal(out.decision, "block");
       assert.equal(out.hookSpecificOutput.hookEventName, "PreToolUse");
       assert.match(out.hookSpecificOutput.additionalContext, /\[Vision of shot\.png\]:/);
-      assert.match(out.hookSpecificOutput.additionalContext, /mock 描述/);
+      assert.match(out.hookSpecificOutput.additionalContext, /mock description/);
       assert.equal(mock.requests.length, 1);
     } finally {
       await rm(base, { recursive: true, force: true });
@@ -184,7 +184,7 @@ test("VISION_DISABLE=1 → {} + stderr hint, exit 0", async () => {
       });
       assert.equal(r.code, 0);
       assert.deepEqual(JSON.parse(r.stdout.trim()), {});
-      assert.match(r.stderr, /disabled|跳过/);
+      assert.match(r.stderr, /disabled/);
       assert.equal(mock.requests.length, 0);
     } finally {
       await rm(base, { recursive: true, force: true });
@@ -218,7 +218,7 @@ test("oversized image → {} + stderr, no API call", async () => {
       const r = await runHook([], { input: READ_EVENT(project, "big.png"), cwd: project, env: cleanEnv(home) });
       assert.equal(r.code, 0);
       assert.deepEqual(JSON.parse(r.stdout.trim()), {});
-      assert.match(r.stderr, /maxBytes|过大/);
+      assert.match(r.stderr, /maxBytes/);
       assert.equal(mock.requests.length, 0);
     } finally {
       await rm(base, { recursive: true, force: true });
