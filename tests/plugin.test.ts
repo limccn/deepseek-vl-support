@@ -41,6 +41,11 @@ const PLUGIN_TOP_LEVEL_KEYS = [
 
 let tmp: { base: string; project: string; home: string } | null = null;
 const savedEnv = { ...process.env };
+// The live env lookup is case-insensitive on Windows; the spread copy is a
+// plain object, so its PATH key keeps the OS casing (`Path`) and
+// `savedEnv.PATH` would be undefined under a PowerShell-spawned node.
+// Capture PATH via the live object instead.
+const savedPath = process.env.PATH ?? "";
 
 async function makeEnv(): Promise<{ base: string; project: string; home: string }> {
   const base = await mkdtemp(join(tmpdir(), "dvls-plugin-"));
@@ -263,7 +268,7 @@ async function makeMockClients(base: string): Promise<MockClients> {
 }
 
 function putClientsOnPath(mock: MockClients, installed = false, fail = ""): void {
-  process.env.PATH = `${mock.binDir}${delimiter}${savedEnv.PATH ?? ""}`;
+  process.env.PATH = `${mock.binDir}${delimiter}${savedPath}`;
   process.env.DVLS_MOCK_STATE_DIR = mock.stateDir;
   if (installed) process.env.DVLS_MOCK_INSTALLED = "1";
   if (fail) process.env.DVLS_MOCK_FAIL = fail;

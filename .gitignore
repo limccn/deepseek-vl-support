@@ -8,3 +8,8 @@ dist/
 .claude/
 .codex/
 .cache/
+
+AGENTS.md
+package-lock.json
+
+.trellis/
