@@ -55,6 +55,11 @@ export interface Preset {
 // Preset order follows D2: remote APIs first, local endpoints last.
 export const PRESETS: Preset[] = [
   { id: "openrouter", label: "OpenRouter (cloud)", baseUrl: "https://openrouter.ai/api/v1", model: "qwen/qwen2.5-vl-72b-instruct" },
+  { id: "moonshot", label: "Moonshot (cloud)", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-32k-vision-preview" },
+  { id: "minimax", label: "MiniMax (cloud)", baseUrl: "https://api.minimaxi.com/v1", model: "MiniMax-VL-01" },
+  { id: "zhipu", label: "Zhipu GLM (cloud)", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4v-flash" },
+  { id: "stepfun", label: "StepFun (cloud)", baseUrl: "https://api.stepfun.com/v1", model: "step-1o-turbo-vision" },
+  { id: "opencodezen", label: "OpenCode Zen (cloud)", baseUrl: "https://opencode.ai/zen/v1", model: "mimo-v2.5-free" },
   { id: "siliconflow", label: "SiliconFlow (cloud)", baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-VL-72B-Instruct" },
   { id: "dashscope", label: "Aliyun DashScope (cloud)", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-vl-max" },
   { id: "custom", label: "Custom", baseUrl: "", model: "" },

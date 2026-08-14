@@ -2,96 +2,122 @@
 
 > **中文说明** → [docs/README.zh-CN.md](./docs/README.zh-CN.md)
 
-Give DeepSeek (text-only) models **vision** in Claude Code and Codex by routing
-image files to any OpenAI-compatible vision endpoint (OpenRouter, SiliconFlow,
-DashScope, Ollama, llama.cpp, vLLM, LM Studio, …). Zero runtime dependencies,
-MIT licensed.
+## What this does
+
+Some AI models (such as DeepSeek) are text-only: they can read your files, but
+they cannot look at pictures. Screenshots of errors, UI mockups, charts — these
+are invisible to such models.
+
+This small tool gives them "eyes". Once installed, whenever the model tries to
+read a picture, the tool sends that picture to a vision service of your choice
+(Moonshot, OpenRouter, SiliconFlow, Ollama …), receives a detailed text
+description, and hands that description to the model. The model then works from
+the description, as if it could see the picture.
 
 ```
-Model (DeepSeek)  Read foo.png
-  → PreToolUse hook (node hook.cjs)
-      → detects image → cache miss → POST {baseUrl}/chat/completions (base64)
-  → block + additionalContext: "[Vision of foo.png]: <detailed description>"
-  → model reasons from the description (the original Read is replaced by text)
+Model (DeepSeek)  Read screenshot.png
+  → this tool intercepts the read
+  → picture → your vision service → detailed text description comes back
+  → the model receives: "[Vision of screenshot.png]: <detailed description>"
+  → the model continues from the description
 ```
 
-## Features
+No model settings to change, no extra configuration files to write — it works
+automatically after a one-time setup. One command to install, one command to
+remove. MIT licensed.
 
-- **Claude Code**: PreToolUse(Read) hook intercepts image files automatically and
-  injects the vision endpoint's detailed description as `additionalContext`;
-  SessionStart self-check; `/vision` slash command; Agent Skills skill.
-- **Codex**: MCP stdio server (`describe_image` / `vision_status` tools) +
-  AGENTS.md guidance + automatic models.json bug fix (openai/codex#36382,
-  `supports_search_tool` hides all MCP tools).
-- **Description cache**: `sha256+mtimeMs+size+model` key, 64MB LRU; re-reading
-  the same image with the same model does not cost another API call.
-- **Fallback chain**: on primary-model failure, degrade in order, sharing one
-  overall time budget.
-- **One-command install/uninstall**: numbered menu wizard, idempotent, `.bak`
-  backups before writes, marker checks protect user-authored files.
+## Who this is for
 
-## Requirements
+- You use **Claude Code** or **Codex** with a DeepSeek (or other text-only) model.
+- You want that model to understand pictures: error screenshots, UI mockups,
+  charts, photos of notes.
 
-- Node.js ≥ 18 (zero runtime dependencies, devDependencies only)
-- An OpenAI-compatible vision endpoint (remote or local)
+## Before you start (what you need)
 
-## Quick start
+1. **Node.js 18 or newer.** Check with `node -v` — if it prints a version number,
+   you are ready. If not, install it from <https://nodejs.org>.
+2. **An account at a vision service, and its API key.** The vision service is
+   the "eyes provider" — a website that looks at pictures for you. Cloud options
+   you can register for: **Moonshot**, **OpenRouter**, **MiniMax**,
+   **Zhipu GLM**, **StepFun**, **OpenCode Zen**, **SiliconFlow**,
+   **DashScope**. Free local options: **Ollama**, **llama.cpp**, **vLLM**,
+   **LM Studio** (these run on your own computer). The **API key** is a secret
+   code from that service (usually under "API keys" on its website). The
+   installer asks for it once and stores it only on your computer.
+3. Claude Code or Codex already installed.
+
+## Install (about 2 minutes)
+
+Open a terminal in **your project folder**:
 
 ```bash
-# Run inside the target project directory (interactive wizard)
+cd path/to/your/project
 npx deepseek-vl-support@latest install
-# or, after installing to PATH:
-deepseek-vl-support install
 ```
 
-> Both commands are equivalent: `npx deepseek-vl-support@latest …` and the local
-> `deepseek-vl-support …` after installation point to the same bin (the package
-> ships a single bin entry named after the package: `deepseek-vl-support`).
-> Note: run `npx deepseek-vl-support@latest …` OUTSIDE the package's own
-> directory — inside it, the local package.json matches the spec, npx skips
-> installation, and the cmd reports `'deepseek-vl-support' is not recognized`
-> (a run-location issue, unrelated to the package contents).
+A numbered menu appears and asks 7 questions. **Most have a sensible default —
+just press Enter to accept it.**
 
-The wizard confirms each step via a numbered menu (every step has a default,
-Enter skips):
+| # | Question | What it means | Default |
+|---|---|---|---|
+| 1 | Which tool to enhance? | The AI tool you use: `claude` / `codex` / `both` | both |
+| 2 | Vision endpoint preset | Which "eyes provider" to use — pick the one you have an account for (see the endpoint table below) | openrouter |
+| 3 | Base URL | The address of that service (the preset fills this in) | from preset |
+| 4 | API key | Your secret code for that service; stored only on your computer | Enter skips |
+| 5 | Vision model id | Which "eyes" to use (the preset fills this in) | from preset |
+| 6 | Fallback models | Backup "eyes" if the main one fails (optional) | Enter skips |
+| 7 | Install scope | This project only, or all your projects | project |
 
-1. Target tool: `claude` / `codex` / `both` (default both)
-2. Vision endpoint preset: OpenRouter → SiliconFlow → DashScope → Custom → Ollama → llama.cpp → vLLM → LM Studio
-3. Endpoint address (base URL, OpenAI-compatible, ends with `/v1`)
-4. API key (Enter to skip; written only to `.deepseek-vl/config.json`; `.gitignore` already gets `.deepseek-vl/`)
-5. Vision model id (e.g. `qwen2.5vl:7b`)
-6. Fallback models (optional, `model@baseUrl, model2` or a JSON array)
-7. Install scope: project (`.claude/` `.codex/`) or global (`~/.claude` `~/.codex`)
+When it finishes:
 
-Restart the session as prompted after installation:
-
-- Claude Code: restart the session for the hook to take effect; afterwards,
-  reading an image file automatically injects the vision description;
-- Codex: restart the session and verify with `codex mcp list` that the
-  `deepseek-vl` server is connected.
-
-CI / non-interactive install (all parameters can be flags or environment variables):
+1. **Restart the session** — the installer prints this reminder, and it is
+   required for the effect to kick in.
+2. Optional check — run the health check and look for `[OK]`:
 
 ```bash
-npx deepseek-vl-support install --non-interactive \
-  --target claude --preset openrouter \
-  --base-url https://openrouter.ai/api/v1 --model qwen/qwen2.5-vl-72b-instruct \
-  --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://api.siliconflow.cn/v1"
-# or export environment variables: VISION_BASE_URL VISION_MODEL VISION_API_KEY VISION_FALLBACKS DVLS_TARGET DVLS_SCOPE
+npx deepseek-vl-support@latest doctor
 ```
 
-Preview before committing:
+Preview before committing (prints what would be written, writes nothing):
 
 ```bash
-npx deepseek-vl-support install --non-interactive --dry-run --target both
-# Preview which files will be written, without actually writing
+npx deepseek-vl-support@latest install --dry-run
 ```
 
-## Endpoint examples
+> Tip: run `npx deepseek-vl-support@latest …` from **your own project folder**.
+> Running it inside this tool's own source folder hits a known npx quirk
+> (`'deepseek-vl-support' is not recognized`) — a run-location issue, not a
+> package problem.
+
+## Try it out
+
+Fastest check — describe a picture directly in the terminal:
+
+```bash
+npx deepseek-vl-support@latest describe path/to/a/picture.png
+```
+
+A good text description comes back → everything is wired up correctly.
+
+From then on:
+
+- **Claude Code**: read any picture in the session (png / jpg / jpeg / gif /
+  webp / bmp) — the model automatically receives the description. Manually:
+  `/vision path/to/picture.png "your question"`.
+- **Codex**: ask the model to call `mcp__deepseek-vl__describe_image(path)`;
+  `mcp__deepseek-vl__vision_status()` shows the current settings plus a health
+  check.
+
+## Choosing the endpoint (reference)
 
 | Endpoint | base URL | Example model |
 |---|---|---|
+| Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-32k-vision-preview` |
 | OpenRouter | `https://openrouter.ai/api/v1` | `qwen/qwen2.5-vl-72b-instruct` |
+| MiniMax | `https://api.minimaxi.com/v1` | `MiniMax-VL-01` |
+| Zhipu GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4v-flash` |
+| StepFun | `https://api.stepfun.com/v1` | `step-1o-turbo-vision` |
+| OpenCode Zen | `https://opencode.ai/zen/v1` | `mimo-v2.5-free` |
 | SiliconFlow | `https://api.siliconflow.cn/v1` | `Qwen/Qwen2.5-VL-72B-Instruct` |
 | DashScope | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-vl-max` |
 | Ollama (local) | `http://localhost:11434/v1` | `qwen2.5vl:7b` (run `ollama pull qwen2.5vl:7b` first) |
@@ -99,21 +125,64 @@ npx deepseek-vl-support install --non-interactive --dry-run --target both
 | vLLM (local) | `http://localhost:8000/v1` | `deepseek-ai/deepseek-vl2` |
 | LM Studio (local) | `http://localhost:1234/v1` | `qwen2.5-vl-7b-instruct` |
 
-## Configuration
+## Everyday commands (cheat sheet)
 
-Resolution precedence (field-by-field override): environment variables `VISION_*`
-> project `.deepseek-vl/config.json` > global `~/.deepseek-vl/config.json` >
-defaults (`http://localhost:11434/v1`, timeout 120000ms, maxBytes 10MB,
-enabled true).
+| What you want | Command |
+|---|---|
+| Install | `npx deepseek-vl-support@latest install` |
+| Health check | `npx deepseek-vl-support@latest doctor` (add `--all` to check fallbacks too) |
+| Describe a picture now | `npx deepseek-vl-support@latest describe picture.png` |
+| See current settings | `npx deepseek-vl-support@latest config get` |
+| Change a setting | `npx deepseek-vl-support@latest config set maxBytes 5242880` |
+| Remove the tool | `npx deepseek-vl-support@latest uninstall` |
+| Remove + delete settings too | `npx deepseek-vl-support@latest uninstall --purge-config` |
+
+## Changing settings
+
+Your answers are saved in `.deepseek-vl/config.json` inside the project folder.
+Usually you never need to touch it. The two settings worth knowing:
+
+| Setting | Meaning | Default |
+|---|---|---|
+| `maxBytes` | Pictures bigger than this are skipped (saves time and money) | 10485760 (10 MB) |
+| `timeoutMs` | How long to wait for one description | 120000 (2 minutes) |
+
+Example — skip pictures over 5 MB:
+
+```bash
+npx deepseek-vl-support@latest config set maxBytes 5242880
+```
+
+Describing the same picture twice is free: results are cached on your machine
+(64 MB limit). Change the picture and it gets described again.
+
+## Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| The model still doesn't describe pictures | 1) Restart the session (required after install). 2) Run `… doctor` and look for `[OK]`. |
+| `doctor` shows "unreachable" or no `[OK]` | The service address or key is wrong: check the base URL ends with `/v1` and the API key is correct. (If the service hides its model list, `doctor` shows a warning instead — that is fine as long as it says reachable.) |
+| "image too large" hint | The picture exceeds the limit — compress or crop it (e.g. under 5 MB, long side ~2000 px), or raise the limit with `config set maxBytes …`. |
+| Descriptions are slow | Lower the limit (`config set maxBytes 5242880`) or switch to a faster endpoint. |
+| Pasted (Ctrl+V) pictures are not described | Pasted images bypass the read path — save the picture as a file first, then read it (or use `/vision` / `describe_image`). |
+| Codex: `mcp__deepseek-vl__*` tools not visible | A known Codex bug hides them. The installer fixes it automatically; manual fix: in `~/.codex/models.json` set `"supports_search_tool": false` for the DeepSeek entry. |
+| Codex asks for approval on the first tool call | Normal for any MCP server — click Allow once. In non-interactive `codex exec`, use `deepseek-vl-support describe <file>` instead. |
+| Windows terminal shows garbled text | Run `chcp 65001`, or use Windows Terminal / the VS Code terminal. |
+| DeepSeek v4-r1 / reasoning models unusable | Reasoning models cannot call tools. In Codex use `[model_providers.deepseek] wire_api = "chat"` plus a non-reasoning model; prefer a non-reasoning vision model too. |
+| Nothing happens and the model sees `[Unsupported Image]` | Vision is switched off (`VISION_DISABLE=1` or `enabled: false` in the config) — turn it back on to use vision. |
+
+## Advanced (optional)
+
+Full settings example (`.deepseek-vl/config.json`, editable via
+`deepseek-vl-support config set <key> <value>`):
 
 ```jsonc
-// .deepseek-vl/config.json (modifiable via `deepseek-vl-support config set <key> <value>`)
 {
-  "baseUrl": "https://openrouter.ai/api/v1",
-  "model": "qwen/qwen2.5-vl-72b-instruct",
+  "baseUrl": "https://api.moonshot.cn/v1",
+  "model": "moonshot-v1-32k-vision-preview",
   "apiKey": "sk-...",                    // optional; lives only in .deepseek-vl/config.json
-  "timeoutMs": 120000,                   // per-request timeout (fallback chain shares the total budget)
-  "maxBytes": 10485760,                  // large-image limit: above it, skip and hint to compress/crop
+  "timeoutMs": 120000,                   // per-request timeout (fallbacks share the total budget)
+  "maxBytes": 10485760,                  // pictures above this are skipped
   "fallbacks": [
     { "model": "Qwen/Qwen2.5-VL-72B-Instruct", "baseUrl": "https://api.siliconflow.cn/v1" },
     { "model": "qwen2.5vl:7b" }          // missing fields inherit the primary config
@@ -121,94 +190,25 @@ enabled true).
 }
 ```
 
-- **Large-image limit (maxBytes)**: default 10MB. Images above the limit are not
-  described (the hook lets the Read through and hints to compress/crop; >2MB
-  gets a soft warning). Lower it to save bandwidth:
-  `deepseek-vl-support config set maxBytes 5242880`.
-- **Fallback models**: on primary failure (network/HTTP/timeout/empty response),
-  degrade in order; `model@baseUrl` comma syntax or a JSON array both work.
-  `deepseek-vl-support doctor --all` diagnoses each entry.
-- **Disable vision**: `VISION_DISABLE=1` or `enabled:false` → hook / MCP become no-ops.
-- View/change config: `deepseek-vl-support config get [key]` / `deepseek-vl-support config set <key> <value>` /
-  `deepseek-vl-support config path`.
-
-## Usage
-
-### Claude Code (automatic)
-
-- Reading any image (png/jpg/jpeg/gif/webp/bmp) in a session → automatically
-  injects `[Vision of <file>]: <description>`;
-- `/vision <image path> [question...]` slash command for manual description;
-- Agent Skills: the `deepseek-vision` skill, with an overridable prompt (project
-  `.deepseek-vl/vision-prompt.md` > global > built-in default).
-
-### Codex (MCP tools)
-
-- `mcp__deepseek-vl__describe_image(path, question?)` — describes an image (with caching);
-- `mcp__deepseek-vl__vision_status()` — configuration summary + endpoint health check;
-- AGENTS.md gets the usage guidance injected; DeepSeek models cannot see images
-  themselves, so ask them to call the tools above to obtain text descriptions.
-- **Project-level installs require trusting the project first**: Codex only loads
-  the MCP section of a project-level `.codex/config.toml` in trusted directories —
-  untrusted directories silently ignore it (only user-level servers are visible),
-  and non-interactive `codex exec` even refuses to run ("Not inside a trusted
-  directory"). After a project-level install, trust the project in an interactive
-  `codex` session first; for CI / non-interactive / untrusted scenarios use a
-  `--global` install instead.
-
-## Uninstall
+- **Fallbacks**: if the main service fails (network error / timeout / empty
+  answer), the tool retries with the next one, in order, sharing one time
+  budget. `doctor --all` checks each entry.
+- **Environment variables** override the file (field by field): `VISION_BASE_URL`,
+  `VISION_MODEL`, `VISION_API_KEY`, `VISION_FALLBACKS`, `DVLS_TARGET`,
+  `DVLS_SCOPE`.
+- **Non-interactive / CI install** (no menu; all answers as flags):
 
 ```bash
-deepseek-vl-support uninstall            # removes hook/skill/command/MCP registration, keeps config + cache
-deepseek-vl-support uninstall --purge-config   # also deletes .deepseek-vl/ (config+cache) and the .gitignore entry
-deepseek-vl-support uninstall --global --target codex
+npx deepseek-vl-support@latest install --non-interactive \
+  --target both --preset custom \
+  --base-url https://api.moonshot.cn/v1 --model moonshot-v1-32k-vision-preview \
+  --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
 ```
 
-Only files carrying this tool's markers are removed; user-authored files (no
-marker) are always skipped with a notice. All modifications are backed up as
-`.bak` first.
-
-## Troubleshooting
-
-- **Windows garbled text / broken JSON**: the hook and CLI force UTF-8 output;
-  on garbled terminals run `chcp 65001` or use Windows Terminal / the VS Code
-  terminal (UTF-8 by default).
-- **Hook timeout**: each Read's vision call has a total budget of 50 seconds
-  (including the fallback chain). Slow endpoints or large images make the model
-  wait longer; prefer lowering maxBytes or switching to a faster endpoint.
-- **Codex cannot see `mcp__deepseek-vl__*` tools**: openai/codex#36382 — DeepSeek's
-  models.json `supports_search_tool: true` hides all MCP tools. The installer
-  fixes it automatically; manual fix: set `"supports_search_tool": false` for
-  the DeepSeek entry in `~/.codex/models.json`.
-- **Codex requires approval on first MCP tool call**: the first call to
-  `mcp__deepseek-vl__*` in an interactive session shows an approval prompt —
-  click Allow once (standard Codex behavior for all MCP servers, not specific to
-  this tool); under non-interactive `codex exec` (approval_policy=never) MCP
-  calls are cancelled automatically ("user cancelled MCP tool call") — use the
-  CLI command `deepseek-vl-support describe <file>` in that scenario.
-- **Reasoning models unusable**: DeepSeek v4-r1 / reasoning models do not support
-  function calling (tool use). Codex config needs
-  `[model_providers.deepseek] wire_api = "chat"` and a non-reasoning model;
-  prefer a non-reasoning vision model on the vision side too.
-- **Limitation of pasted images**: images pasted via Ctrl+V in Claude Code go
-  through the edit/paste channel, not the Read hook, and cannot be described
-  automatically. Save them as files and Read (or use the `/vision` command, or
-  Codex's describe_image tool).
-- **`[Unsupported Image]` fallback text**: when vision is disabled
-  (VISION_DISABLE / enabled:false), the model only sees the placeholder text
-  `[Unsupported Image]` when reading images (no crash), and will usually notice
-  and suggest calling the `deepseek-vision` skill — follow the hint.
-- **Image too large**: above maxBytes, description is skipped — compress or crop
-  first (e.g. under 5 MB, ~2000px long edge).
-- **Endpoint unreachable**: `deepseek-vl-support doctor` prints detailed
-  diagnostics; confirm the base URL ends with `/v1` and the model id matches the
-  `/v1/models` list (Ollama may use the `./qwen2.5vl:7b` form; comparison is
-  normalized internally).
-
-## Development
+## For developers
 
 ```bash
-npm install            # devDeps: typescript esbuild @types/node
+npm install            # devDeps only: typescript esbuild @types/node
 npm run build          # esbuild → dist/cli.js + dist/hook.cjs + assets/
 npx tsc --noEmit       # typecheck
 node --test tests/     # mock-based automated tests (requires a build first)
@@ -219,8 +219,9 @@ Real-endpoint E2E manual: `docs/e2e-real-endpoint.md`; release process:
 
 ## Acknowledgements
 
-This project was inspired by [pi-deepseek-vision](https://github.com/psychobarge/pi-deepseek-vision).
-Thanks to psychobarge for their open-source work.
+This project was inspired by
+[pi-deepseek-vision](https://github.com/psychobarge/pi-deepseek-vision) — thanks
+to psychobarge for the open-source work.
 
 ## License
 

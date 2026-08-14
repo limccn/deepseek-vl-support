@@ -25,10 +25,19 @@ function log(msg: string): void {
 }
 
 /** Write the hook JSON payload in a single write, then exit only after the
- *  write flushed (process.exit() before flush truncates piped output). */
+ *  write flushed (process.exit() before flush truncates piped output).
+ *  Exit naturally (process.exitCode) — on Windows a forced process.exit()
+ *  after async HTTPS work asserts in libuv (UV_HANDLE_CLOSING, win/async.c);
+ *  reproduced in E2E 0.1.3 with real endpoints and a minimal stdin+fetch
+ *  repro (natural exit is clean). The unref'd watchdog forces an exit only
+ *  if some future leak keeps the loop alive. */
 function output(obj: unknown): void {
   const json = JSON.stringify(obj);
-  process.stdout.write(json + "\n", () => process.exit(0));
+  process.stdout.write(json + "\n", () => {
+    process.exitCode = 0;
+  });
+  const watchdog = setTimeout(() => process.exit(0), 10_000);
+  watchdog.unref();
 }
 
 function noop(): void {
@@ -38,6 +47,11 @@ function noop(): void {
 async function readStdin(): Promise<string> {
   const chunks: string[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as string);
+  // Release the stdin handle after EOF. Windows: a live-but-closing stdin
+  // handle at process.exit() triggers a libuv assertion
+  // (UV_HANDLE_CLOSING, win/async.c) after async HTTPS work — observed with
+  // real endpoints (E2E 0.1.3); localhost/mock servers do not reproduce it.
+  process.stdin.destroy();
   return chunks.join("");
 }
 

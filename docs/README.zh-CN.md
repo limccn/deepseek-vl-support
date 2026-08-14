@@ -2,85 +2,110 @@
 
 > **English** → [README.md](../README.md)
 
-给 Claude Code 与 Codex 里的 DeepSeek（纯文本）模型补上「眼睛」：把图片文件转发给任意
-OpenAI 兼容的视觉端点（OpenRouter、硅基流动、百炼、Ollama、llama.cpp、vLLM、LM Studio…）。
-零运行时依赖，MIT 协议。
+## 它能做什么
+
+有些 AI 模型（比如 DeepSeek）只能读文字：它们能看你的文件，却看不了图片。报错截图、
+界面草图、图表、手写笔记照片——这些对它们来说都是"看不见"的。
+
+这个小工具就是给它们装上"眼睛"。装好之后，每当模型想读一张图片，工具会把图片发给一家
+你选的"看图服务"（Moonshot、MiniMax、智谱、OpenRouter、Ollama……），拿回一段详细的文字
+描述，再把描述交给模型。模型拿着这段描述继续干活，就像真的看见了图片一样。
 
 ```
-模型(DeepSeek)  Read foo.png
-  → PreToolUse hook (node hook.cjs)
-      → 识别图片 → 未命中缓存 → POST {baseUrl}/chat/completions (base64)
-  → block + additionalContext: "[Vision of foo.png]: <详细描述>"
-  → 模型基于描述继续推理（原 Read 被替换为文本描述）
+模型(DeepSeek)  Read screenshot.png
+  → 本工具在读取时拦截
+  → 图片 → 你的看图服务 → 返回详细的文字描述
+  → 模型收到："[Vision of screenshot.png]: <详细描述>"
+  → 模型继续基于描述推理
 ```
 
-## 功能
+不用改模型设置，不用写配置文件——一次性设置后全自动运行。一条命令安装，一条命令卸载。
+MIT 开源协议。
 
-- **Claude Code**：PreToolUse(Read) hook 自动拦截图片文件，把视觉端点返回的详细描述作为
-  `additionalContext` 注入；SessionStart 启动自检；`/vision` 斜杠命令；Agent Skills 技能。
-- **Codex**：MCP stdio server（`describe_image` / `vision_status` 两个工具）+ AGENTS.md 指引 +
-  自动修复 models.json bug（openai/codex#36382，`supports_search_tool` 会导致 MCP 工具全部不可见）。
-- **描述缓存**：`sha256+mtimeMs+size+model` 键，64MB LRU，同一图片同一模型二次读取不重复计费。
-- **兜底模型链（fallbacks）**：主模型失败按序降级，共享整体时间预算。
-- **一键安装/卸载**：数字菜单向导，幂等，写前 `.bak` 备份，标记校验保护用户自写文件。
+## 适合谁用
 
-## 环境要求
+- 你在用 **Claude Code** 或 **Codex**，接的是 DeepSeek（或其他纯文字）模型。
+- 你想让模型看懂图片：报错截图、界面草图、图表、手写笔记照片。
 
-- Node.js ≥ 18（零运行时依赖，仅 devDependencies）
-- 一个 OpenAI 兼容的视觉端点（远程或本地）
+## 开始之前（需要准备什么）
 
-## 快速开始
+1. **Node.js 18 或更高版本。** 在终端运行 `node -v`——能打印出版本号就说明可以了。
+   没有的话去 <https://nodejs.org> 安装。
+2. **一家看图服务的账号，以及它的 API key。** 看图服务就是帮你"看图片"的网站。可以注册的
+   云端服务：**Moonshot**、**OpenRouter**、**MiniMax**、**智谱 GLM**、**StepFun**、
+   **OpenCode Zen**、**SiliconFlow（硅基流动）**、**DashScope（阿里云百炼）**。免费的本地
+   方案：**Ollama**、**llama.cpp**、**vLLM**、**LM Studio**（这些跑在你自己的电脑上）。
+   **API key** 是这家服务发给你的密钥（一般在它网站的"API 密钥"页面里）。安装时问一次，
+   只存在你自己的电脑上。
+3. 已安装 Claude Code 或 Codex。
+
+## 安装（大约 2 分钟）
+
+在**你的项目文件夹**里打开终端：
 
 ```bash
-# 在目标项目目录内运行（向导交互式）
+cd path/to/your/project
 npx deepseek-vl-support@latest install
-# 或安装到 PATH 后：
-deepseek-vl-support install
 ```
 
-> 两条命令等价：`npx deepseek-vl-support@latest …` 与安装后本地 `deepseek-vl-support …`
-> 指向同一个 bin（包内只提供与包名同名的单一 bin 条目 `deepseek-vl-support`）。
-> 注意：请在**包目录之外**运行 `npx deepseek-vl-support@latest …`——在包自身目录内运行
-> 时本地 package.json 会命中 spec，npx 跳过安装，cmd 报 `'deepseek-vl-support' is not
-> recognized`（属运行位置问题，与包内容无关）。
+会出现一个带编号的菜单，共 7 个问题。**大部分都有合适的默认值——直接按回车即可。**
 
-向导按编号菜单逐步确认（每步都有默认值、可回车跳过）：
+| # | 问题 | 什么意思 | 默认值 |
+|---|---|---|---|
+| 1 | 增强哪个工具？ | 你用的 AI 工具：`claude` / `codex` / `both`（两个都装） | both |
+| 2 | 视觉端点预设 | 用哪家"看图服务"——选你注册了账号的那家（见下方端点表） | openrouter |
+| 3 | 端点地址（Base URL） | 那家服务的地址（预设已帮你填好） | 来自预设 |
+| 4 | API key | 那家服务的密钥；只存在你自己的电脑上 | 回车跳过 |
+| 5 | 视觉模型 id | 用哪双"眼睛"（预设已帮你填好） | 来自预设 |
+| 6 | 兜底模型 | 主服务失灵时的备用"眼睛"（可不填） | 回车跳过 |
+| 7 | 安装范围 | 只装这个项目，还是所有项目 | project |
 
-1. 目标工具：`claude` / `codex` / `both`（默认 both）
-2. 视觉端点预设：OpenRouter → 硅基流动 → 百炼 → 自定义 → Ollama → llama.cpp → vLLM → LM Studio
-3. 端点地址（base URL，OpenAI 兼容，以 `/v1` 结尾）
-4. API key（回车跳过；只写入 `.deepseek-vl/config.json`，`.gitignore` 已自动添加 `.deepseek-vl/`）
-5. 视觉模型 id（如 `qwen2.5vl:7b`）
-6. 兜底模型（可选，`model@baseUrl, model2` 或 JSON 数组）
-7. 安装作用域：项目级（`.claude/` `.codex/`）或全局（`~/.claude` `~/.codex`）
+装完之后：
 
-安装完成后按提示重启会话：
-
-- Claude Code：重启会话使 hook 生效，此后 Read 图片文件即自动注入视觉描述；
-- Codex：重启会话，用 `codex mcp list` 验证 `deepseek-vl` server 已连接。
-
-CI / 非交互安装（全部参数可 flag 或环境变量传入）：
+1. **重启会话**——安装器会打印这条提醒，必须重启才能生效。
+2. 可选检查——运行健康检查，看到 `[OK]` 就说明一切正常：
 
 ```bash
-npx deepseek-vl-support install --non-interactive \
-  --target claude --preset openrouter \
-  --base-url https://openrouter.ai/api/v1 --model qwen/qwen2.5-vl-72b-instruct \
-  --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://api.siliconflow.cn/v1"
-# 或导出环境变量：VISION_BASE_URL VISION_MODEL VISION_API_KEY VISION_FALLBACKS DVLS_TARGET DVLS_SCOPE
+npx deepseek-vl-support@latest doctor
 ```
 
-先看效果再动手：
+动手前先预览（只打印将要写入的内容，不真正写文件）：
 
 ```bash
-npx deepseek-vl-support install --non-interactive --dry-run --target both
-# 预览将写入哪些文件，不实际写入
+npx deepseek-vl-support@latest install --dry-run
 ```
 
-## 端点配置示例
+> 提示：请在**你自己的项目文件夹**里运行 `npx deepseek-vl-support@latest …`。在这个工具
+> 自己的源码目录里运行会踩到一个已知的 npx 怪癖（`'deepseek-vl-support' is not
+> recognized`）——这是运行位置的问题，不是包的问题。
+
+## 试一试
+
+最快的验证方式——直接在终端里描述一张图片：
+
+```bash
+npx deepseek-vl-support@latest describe path/to/a/picture.png
+```
+
+返回一段像样的文字描述 → 说明一切接线正确。
+
+从此以后：
+
+- **Claude Code**：在会话里 Read 任何图片（png / jpg / jpeg / gif / webp / bmp）——模型会
+  自动收到描述。手动方式：`/vision path/to/picture.png "你的问题"`。
+- **Codex**：让模型调用 `mcp__deepseek-vl__describe_image(path)`；
+  `mcp__deepseek-vl__vision_status()` 显示当前设置和健康检查结果。
+
+## 端点参考
 
 | 端点 | base URL | 示例模型 |
 |---|---|---|
+| Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-32k-vision-preview` |
 | OpenRouter | `https://openrouter.ai/api/v1` | `qwen/qwen2.5-vl-72b-instruct` |
+| MiniMax | `https://api.minimaxi.com/v1` | `MiniMax-VL-01` |
+| Zhipu GLM 智谱 | `https://open.bigmodel.cn/api/paas/v4` | `glm-4v-flash` |
+| StepFun | `https://api.stepfun.com/v1` | `step-1o-turbo-vision` |
+| OpenCode Zen | `https://opencode.ai/zen/v1` | `mimo-v2.5-free` |
 | SiliconFlow 硅基流动 | `https://api.siliconflow.cn/v1` | `Qwen/Qwen2.5-VL-72B-Instruct` |
 | DashScope 阿里云百炼 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-vl-max` |
 | Ollama（本地） | `http://localhost:11434/v1` | `qwen2.5vl:7b`（先 `ollama pull qwen2.5vl:7b`） |
@@ -88,20 +113,63 @@ npx deepseek-vl-support install --non-interactive --dry-run --target both
 | vLLM（本地） | `http://localhost:8000/v1` | `deepseek-ai/deepseek-vl2` |
 | LM Studio（本地） | `http://localhost:1234/v1` | `qwen2.5-vl-7b-instruct` |
 
-## 配置
+## 常用命令速查
 
-解析优先级（逐字段覆盖）：环境变量 `VISION_*` > 项目 `.deepseek-vl/config.json` >
-全局 `~/.deepseek-vl/config.json` > 默认值（`http://localhost:11434/v1`，timeout 120000ms，
-maxBytes 10MB，enabled true）。
+| 想做什么 | 命令 |
+|---|---|
+| 安装 | `npx deepseek-vl-support@latest install` |
+| 健康检查 | `npx deepseek-vl-support@latest doctor`（加 `--all` 连兜底模型一起检查） |
+| 现在就描述一张图片 | `npx deepseek-vl-support@latest describe picture.png` |
+| 查看当前设置 | `npx deepseek-vl-support@latest config get` |
+| 修改一项设置 | `npx deepseek-vl-support@latest config set maxBytes 5242880` |
+| 卸载 | `npx deepseek-vl-support@latest uninstall` |
+| 卸载并删除设置 | `npx deepseek-vl-support@latest uninstall --purge-config` |
+
+## 修改设置
+
+你的回答保存在项目文件夹里的 `.deepseek-vl/config.json`。一般永远不用动它。值得知道的
+两项设置：
+
+| 设置 | 含义 | 默认值 |
+|---|---|---|
+| `maxBytes` | 超过这个大小的图片会被跳过（省时省钱） | 10485760（10 MB） |
+| `timeoutMs` | 等一次描述要多久 | 120000（2 分钟） |
+
+示例——跳过超过 5 MB 的图片：
+
+```bash
+npx deepseek-vl-support@latest config set maxBytes 5242880
+```
+
+同一张图片描述两次是免费的：结果缓存在你的电脑上（上限 64 MB）。图片变了才会重新描述。
+
+## 故障排查
+
+| 现象 | 怎么办 |
+|---|---|
+| 模型还是不描述图片 | 1) 重启会话（安装后必须重启）。2) 运行 `… doctor`，看有没有 `[OK]`。 |
+| `doctor` 显示 "unreachable" 或没有 `[OK]` | 服务地址或密钥不对：确认 base URL 以 `/v1` 结尾、API key 正确。（如果服务不公开模型列表，`doctor` 会改为显示警告——只要说 reachable 就没问题。） |
+| 提示 "image too large" | 图片超限了——先压缩或裁剪（比如 5 MB 以内、长边约 2000 像素），或者用 `config set maxBytes …` 调大限制。 |
+| 描述很慢 | 调低限制（`config set maxBytes 5242880`），或换一个更快的端点。 |
+| 粘贴（Ctrl+V）的图片不被描述 | 粘贴的图片不走 Read 通道——先把图片存成文件再 Read（或用 `/vision` / `describe_image`）。 |
+| Codex 里看不到 `mcp__deepseek-vl__*` 工具 | Codex 的一个已知 bug 会隐藏它们。安装器会自动修复；手动修复：在 `~/.codex/models.json` 里把 DeepSeek 条目的 `"supports_search_tool"` 设为 `false`。 |
+| Codex 第一次调用工具要批准 | 任何 MCP server 都会这样——点一次 Allow 即可。非交互 `codex exec` 场景请改用 `deepseek-vl-support describe <file>`。 |
+| Windows 终端显示乱码 | 运行 `chcp 65001`，或改用 Windows Terminal / VS Code 终端。 |
+| DeepSeek v4-r1 / 推理模型用不了 | 推理模型不支持调用工具。Codex 里使用 `[model_providers.deepseek] wire_api = "chat"` 并搭配非推理模型；视觉端也建议用非推理视觉模型。 |
+| 没反应，模型只看到 `[Unsupported Image]` | 视觉被关掉了（`VISION_DISABLE=1` 或配置里 `enabled: false`）——打开开关即可恢复。 |
+
+## 进阶用法（可选）
+
+完整设置示例（`.deepseek-vl/config.json`，可用 `deepseek-vl-support config set <key> <value>`
+修改）：
 
 ```jsonc
-// .deepseek-vl/config.json（可由 `deepseek-vl-support config set <key> <value>` 修改）
 {
-  "baseUrl": "https://openrouter.ai/api/v1",
-  "model": "qwen/qwen2.5-vl-72b-instruct",
-  "apiKey": "sk-...",                    // 可省略；仅存在 .deepseek-vl/config.json
+  "baseUrl": "https://api.moonshot.cn/v1",
+  "model": "moonshot-v1-32k-vision-preview",
+  "apiKey": "sk-...",                    // 可省略；只存在 .deepseek-vl/config.json
   "timeoutMs": 120000,                   // 单次请求超时（兜底链共享总预算）
-  "maxBytes": 10485760,                  // 大图限制：超过直接跳过并提示压缩/裁剪
+  "maxBytes": 10485760,                  // 超过此大小的图片会被跳过
   "fallbacks": [
     { "model": "Qwen/Qwen2.5-VL-72B-Instruct", "baseUrl": "https://api.siliconflow.cn/v1" },
     { "model": "qwen2.5vl:7b" }          // 缺省字段继承主配置
@@ -109,74 +177,31 @@ maxBytes 10MB，enabled true）。
 }
 ```
 
-- **大图限制（maxBytes）**：默认 10MB。超过限制的图片不做描述（hook 放行 Read、提示压缩/裁剪；
-  >2MB 有软警告）。改小可省流量：`deepseek-vl-support config set maxBytes 5242880`。
-- **兜底模型（fallbacks）**：主模型失败（网络/HTTP/超时/空响应）按序降级；`model@baseUrl` 逗号
-  语法或 JSON 数组均可。`deepseek-vl-support doctor --all` 逐一诊断。
-- **关闭视觉**：`VISION_DISABLE=1` 或 `enabled:false` → hook / MCP 全部 no-op。
-- 查看/修改配置：`deepseek-vl-support config get [key]` / `deepseek-vl-support config set <key> <value>` /
-  `deepseek-vl-support config path`。
-
-## 用法
-
-### Claude Code（自动）
-
-- 会话中 Read 任何图片（png/jpg/jpeg/gif/webp/bmp）→ 自动注入 `[Vision of <file>]: <描述>`；
-- `/vision <图片路径> [问题...]` 斜杠命令手动描述；
-- Agent Skills：`deepseek-vision` 技能，提示词可覆盖（项目 `.deepseek-vl/vision-prompt.md` >
-  全局 > 内置默认）。
-
-### Codex（MCP 工具）
-
-- `mcp__deepseek-vl__describe_image(path, question?)` — 描述图片（含缓存）；
-- `mcp__deepseek-vl__vision_status()` — 配置摘要 + 端点健康检查；
-- AGENTS.md 已注入使用指引；DeepSeek 模型看不到图片本身，让它调用上述工具获取文本描述。
-- **项目级安装需先信任项目**：codex 只在已信任目录加载项目级 `.codex/config.toml` 的 MCP 段——
-  未信任时该段被静默忽略（仅 user 级服务器可见），非交互 `codex exec` 甚至直接拒绝运行
-  （"Not inside a trusted directory"）。项目级安装后，请先在交互式 `codex` 会话中信任该项目；
-  CI / 非交互 / 未信任场景请改用 `--global` 安装。
-
-## 卸载
+- **兜底模型**：主服务失败（网络错误 / 超时 / 空回答）时按顺序换下一个，共享一个时间预算。
+  `doctor --all` 逐个检查。
+- **环境变量**逐字段覆盖配置文件：`VISION_BASE_URL`、`VISION_MODEL`、`VISION_API_KEY`、
+  `VISION_FALLBACKS`、`DVLS_TARGET`、`DVLS_SCOPE`；`VISION_DISABLE=1` 或配置 `enabled:false`
+  可整体关闭视觉（hook / MCP 全部 no-op）。
+- **查看 / 修改配置**：`config get [key]` / `config set <key> <value>` / `config path`。
+- **自定义提示词（Claude Code 技能）**：项目 `.deepseek-vl/vision-prompt.md` > 全局 > 内置默认。
+- **Codex 项目级安装需先信任项目**：codex 只在已信任目录加载项目级 MCP 配置；项目级安装后
+  请先在交互式会话中信任该项目，CI / 非交互场景请改用 `--global` 安装。
+- **非交互 / CI 安装**（无菜单，全部用参数）：
 
 ```bash
-deepseek-vl-support uninstall            # 移除 hook/技能/命令/MCP 注册，保留配置与缓存
-deepseek-vl-support uninstall --purge-config   # 连 .deepseek-vl/（配置+缓存）与 .gitignore 条目一起删除
-deepseek-vl-support uninstall --global --target codex
+npx deepseek-vl-support@latest install --non-interactive \
+  --target both --preset custom \
+  --base-url https://api.moonshot.cn/v1 --model moonshot-v1-32k-vision-preview \
+  --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
 ```
 
-只删除带本工具标记的文件；用户自写文件（无标记）一律跳过并提示。所有修改前先备份 `.bak`。
-
-## 故障排查
-
-- **Windows 中文乱码 / JSON 损坏**：hook 与 CLI 强制 UTF-8 输出；终端乱码请 `chcp 65001`
-  或在 Windows Terminal / VS Code 终端中运行（默认 UTF-8）。
-- **hook 超时**：每次 Read 的视觉调用总预算 50 秒（含兜底链）。端点慢或图片大时模型等待更久；
-  优先缩短 maxBytes、换更快的端点。
-- **Codex 看不到 `mcp__deepseek-vl__*` 工具**：openai/codex#36382 — DeepSeek models.json 的
-  `supports_search_tool: true` 会隐藏所有 MCP 工具。安装器已自动修复；手工修复：
-  `~/.codex/models.json` 中把 DeepSeek 条目改为 `"supports_search_tool": false`。
-- **Codex 首次调用 MCP 工具需批准**：交互会话首次调用 `mcp__deepseek-vl__*` 会弹批准提示，
-  点一次 Allow 即可（codex 对所有 MCP server 的标准行为，非本工具特有）；非交互
-  `codex exec`（approval_policy=never）下 MCP 调用会被自动取消（"user cancelled MCP tool
-  call"），该场景请改用 CLI 命令 `deepseek-vl-support describe <file>`。
-- **推理模型不可用**：DeepSeek v4-r1 / reasoning 模型不支持函数调用（tool use）。Codex 配置需
-  `[model_providers.deepseek] wire_api = "chat"` 并使用非推理模型；视觉侧也建议用非推理视觉模型。
-- **粘贴图片的局限**：Claude Code 里 Ctrl+V 粘贴的图片走编辑/粘贴通道，不走 Read hook，无法自动
-  描述。保存为文件后用 Read（或 `/vision` 命令、Codex 的 describe_image 工具）。
-- **`[Unsupported Image]` 兜底文案**：视觉关闭（VISION_DISABLE / enabled:false）时模型 Read
-  图片只看到占位文案 `[Unsupported Image]`（不会崩溃），且通常会主动发现并建议调用
-  `deepseek-vision` skill——按提示操作即可。
-- **图片过大**：超过 maxBytes 被跳过——先压缩/裁剪（如 5MB 以内、长边约 2000px）。
-- **端点不可达**：`deepseek-vl-support doctor` 输出详细诊断；确认 base URL 以 `/v1` 结尾、模型 id 与
-  `/v1/models` 列表一致（ollama 可用 `./qwen2.5vl:7b` 形式，内部已归一化比较）。
-
-## 开发
+## 开发者
 
 ```bash
-npm install            # devDeps: typescript esbuild @types/node
+npm install            # 仅 devDependencies：typescript esbuild @types/node
 npm run build          # esbuild → dist/cli.js + dist/hook.cjs + assets/
-npx tsc --noEmit       # typecheck
-node --test tests/     # mock 自动化测试（需先 build）
+npx tsc --noEmit       # 类型检查
+node --test tests/     # 基于 mock 的自动化测试（需先 build）
 ```
 
 真实端点端到端手册见 `e2e-real-endpoint.md`；发布流程见 `releasing.md`。
