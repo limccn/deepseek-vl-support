@@ -114,6 +114,26 @@ npx deepseek-vl-support install --target copilot,cursor,kiro,openclaw,hermes,vsc
 ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + .mcp.json + skills/ (exactly 4 entries)
 ```
 
+### 9.0 Final release verification record (2026-08-14, this machine)
+
+- [x] Repo-as-install-source: `copilot plugin install
+      https://github.com/limccn/deepseek-vl-support` against the pushed
+      12-agent commit (a591dd8) → "Installed 1 skill", version 0.2.0
+      (Copilot CLI 1.0.59). Direct repo/URL installs print a deprecation
+      warning — marketplace is the future path (official copilot-plugins
+      marketplace PR stays out of scope).
+- [x] MCP stdio handshake on the final code: `initialize` →
+      serverInfo `{name: deepseek-vl-support, version: 0.2.0}`;
+      `tools/list` → `[describe_image, vision_status]`; clean exit 0.
+      (Launched with shell resolution — the §9.6 raw-spawn risk remains a
+      per-client real-machine item.)
+- [x] `npm pack --dry-run`: tarball contains `plugin.json`, `mcp.json`,
+      `.mcp.json`, `skills/deepseek-vision/SKILL.md`, `assets/`, `dist/`;
+      excludes `marketplace.json`, `tests/`, `src/`, `docs/`, `.trellis/`.
+- [ ] Not verifiable on this box (no auth / client not installed): §9.1
+      session-level R4 check (needs `copilot auth`), §9.2–9.5 and 9.7–9.10
+      client machines, R2 uninstall command names.
+
 ### 9.1 GitHub Copilot
 
 - [ ] Install line shows `installed via <path>` (CLI present) or
@@ -185,7 +205,7 @@ resolution) works, but a client may spawn MCP stdio without a shell.
 documented raw-spawn ENOENT finding stays as a KNOWN RISK, and the user
 environment is assumed to include npm/npx — the `node` +
 `${PLUGIN_ROOT}/vendor/mcp-server.cjs` fallback was REVERTED and no vendor
-bundle is shipped. Which of the 5 target clients spawn MCP stdio raw vs
+bundle is shipped. Which of the 10 plugin clients spawn MCP stdio raw vs
 shelled is still unknown without their machines.
 
 Record for each client on its real machine that the MCP subprocess resolves
