@@ -82,6 +82,12 @@ How to publish a new version of `deepseek-vl-support` to npm.
    ⚠️ Running inside the package's own project directory matches the local
    package.json, npx skips the install and cmd reports `'deepseek-vl-support'
    is not recognized` — a test-environment artifact, not a package problem.
+   ⚠️ A stale GLOBAL install of the same name (`npm ls -g deepseek-vl-support`)
+   can shadow npx inside the package dir and silently run an OLD version —
+   output looks plausible but version/preset checks fail (seen with 0.1.2
+   shadowing 0.1.3 in smoke 0.1.3). Refresh it (`npm i -g …@latest`), run every
+   smoke command in the clean dir, and verify version-specific output (e.g. a
+   new install preset) instead of trusting that "something ran".
 
 ## Rollback
 
