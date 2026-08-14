@@ -12,8 +12,19 @@ How to publish a new version of `deepseek-vl-support` to npm.
    ```bash
    npm version <major|minor|patch>   # updates package.json and docs in lockstep
    ```
-   Also confirm `VERSION` in `src/cli.ts` and `SERVER_VERSION` in `src/mcp.ts`
-   match package.json (both are manual constants today — do not miss either).
+   Also confirm the manual version constants match package.json (today all
+   four are manual — do not miss any):
+   - `VERSION` in `src/cli.ts`
+   - `SERVER_VERSION` in `src/mcp.ts`
+   - `"version"` in root `plugin.json`
+   - `"version"` in root `marketplace.json` (top level `metadata.version`
+     and the `plugins[0].version` entry)
+   Then regenerate the git-committed plugin skill copy and verify the static
+   compliance tests still pass:
+   ```bash
+   npm run build        # copies assets/SKILL.md → skills/deepseek-vision/SKILL.md
+   node --test "tests/plugin.test.ts"   # asserts all four version fields match
+   ```
    **Keep the single bin entry named after the package**:
    ```json
    "bin": { "deepseek-vl-support": "dist/cli.js" }
@@ -39,17 +50,26 @@ How to publish a new version of `deepseek-vl-support` to npm.
    ```bash
    npm pack --dry-run
    ```
-   Expected contents (`files` whitelist: `dist/ assets/ README.md LICENSE`):
+   Expected contents (`files` whitelist: `dist/ assets/ skills/ plugin.json
+   mcp.json README.md LICENSE`):
    - `dist/cli.js` (ESM, shebang preserved, bin entry)
    - `dist/hook.cjs` (standalone single-file CJS bundle, zero deps, first-line
      banner carries the identity marker `/*! deepseek-vl-support-hook */`)
    - `assets/` (SKILL.md, vision.md, vision-prompt.md, agents-fragment.md,
      skill-references/)
+   - `skills/deepseek-vision/SKILL.md` (the Agent Plugins skill copy; kept in
+     sync with assets/SKILL.md by `npm run build`, committed to git so
+     git-based plugin installs ship it)
+   - `plugin.json`, `mcp.json` (the Agent Plugins v1.0.0 package manifest and
+     its MCP server config — the portable-plugin payload)
    - `README.md`, `LICENSE` — the package ships the English README only; the
      Chinese README lives at `docs/README.zh-CN.md` (docs/ is not packaged).
      Note: npm force-includes every root-level README* file regardless of the
      `files` whitelist — localized READMEs must live under docs/ to stay out
      of the tarball.
+   - `marketplace.json` is intentionally NOT packaged: it is only meaningful
+     in the git repository, where Copilot's `copilot plugin marketplace add`
+     and `copilot plugin install <repo>` read it from the repo root.
    - Must NOT contain: `tests/`, `.trellis/`, `node_modules/`, the source
      `src/` (artifacts already include it), `docs/`, temporary files.
 
@@ -103,7 +123,13 @@ How to publish a new version of `deepseek-vl-support` to npm.
 
 ## Pre-release self-check (incl. spike findings)
 
-- [ ] mock automated tests all green (client/config/detect/cache/hook/install/mcp/smoke)
+- [ ] mock automated tests all green (client/config/detect/cache/hook/install/mcp/plugin/smoke)
+- [ ] version sync: `VERSION` (src/cli.ts), `SERVER_VERSION` (src/mcp.ts),
+      `plugin.json`, `marketplace.json` all equal package.json (plugin.test.ts
+      asserts the static files; the two src constants are manual)
+- [ ] `skills/deepseek-vision/SKILL.md` regenerated via `npm run build` and
+      committed (git plugin installs ship it; the test asserts it equals
+      assets/SKILL.md)
 - [ ] real-endpoint E2E (`e2e-real-endpoint.md`) passes at least once for describe + doctor
 - [ ] spike findings (plan-A block+additionalContext is visible to the model in
       Claude Code) are persisted

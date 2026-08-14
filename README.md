@@ -205,6 +205,54 @@ npx deepseek-vl-support@latest install --non-interactive \
   --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
 ```
 
+## Agent Plugins mode (Copilot / Cursor / Kiro / OpenClaw / Hermes)
+
+Beyond Claude Code and Codex, the package ships as a portable
+[Agent Plugins v1.0.0](https://agent-plugins.org) package (root
+`plugin.json` + `mcp.json` + `skills/deepseek-vision/SKILL.md`), so agents that
+load plugins get vision too — the `deepseek-vision` skill plus the
+`describe_image` / `vision_status` MCP tools backed by the same endpoint
+configuration.
+
+```bash
+# one-shot installer: copies the plugin dir to ~/.deepseek-vl/plugin/ and
+# registers it with the clients you pick (menu defaults to the clients it
+# detects on your machine)
+npx deepseek-vl-support@latest install --target plugin
+
+# non-interactive: choose clients explicitly with --clients (default: all)
+npx deepseek-vl-support@latest install --target plugin --clients copilot,cursor
+```
+
+Per-client behavior:
+
+| Client | Install | Verify | Uninstall |
+|---|---|---|---|
+| GitHub Copilot | `copilot plugin install` + marketplace add (or `enabledPlugins` in `~/.copilot/settings.json` when the CLI is missing) | `copilot plugin list`, then ask for a screenshot description in a session | `copilot plugin uninstall deepseek-vl-support` |
+| Cursor | copies the plugin dir to `~/.cursor/plugins/local/deepseek-vl-support/` (marked) | Developer → Reload Window, then the skill/MCP server shows up | re-run the installer's uninstall (removes the marked dir only) |
+| Kiro | manual — Kiro has no CLI automation surface | Kiro → Powers panel → Add Custom Power → Import power from a folder → select `~/.deepseek-vl/plugin` | same panel, remove the power |
+| OpenClaw | `openclaw plugins install ~/.deepseek-vl/plugin` + `openclaw gateway restart` | `openclaw plugins list`, then ask for a screenshot description | `openclaw plugins uninstall deepseek-vl-support` |
+| Hermes Agent | `hermes plugins install limccn/deepseek-vl-support --no-enable` + `hermes plugins enable deepseek-vl-support` | `hermes plugins list`, then check the skill is discoverable | `hermes plugins uninstall deepseek-vl-support` |
+
+One client failing never blocks the others — the installer reports each client
+separately with guidance (a failed client is usually just "restart the app" or
+a manual command to run).
+
+Configuration for the plugin clients is **environment or global level**:
+`install --target plugin` always writes `~/.deepseek-vl/config.json` (there is
+no project/global choice), and the MCP subprocesses the clients start see
+`VISION_*` environment variables. A project-local `.deepseek-vl/config.json`
+is not visible to them — use `npx deepseek-vl-support@latest config set
+<key> <value> --global` or `VISION_BASE_URL` / `VISION_MODEL` /
+`VISION_API_KEY`.
+
+Uninstall reverses the registration and keeps the materialized plugin dir:
+
+```bash
+npx deepseek-vl-support@latest uninstall --target plugin              # keep config
+npx deepseek-vl-support@latest uninstall --target plugin --purge-config   # + delete config/cache
+```
+
 ## For developers
 
 ```bash

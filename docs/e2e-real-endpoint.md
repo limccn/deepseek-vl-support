@@ -100,6 +100,77 @@ deepseek-vl-support uninstall --purge-config    # remove all artifacts + config/
 git status                              # the project directory should be clean again
 ```
 
+## 9. Agent Plugins (Copilot / Cursor / Kiro / OpenClaw / Hermes)
+
+Run once per release on machines that actually have the client installed.
+Prerequisite: the real endpoint configured (see step 0) and `npm run build`.
+
+```bash
+npx deepseek-vl-support install --target plugin --preset openrouter --api-key $OPENROUTER_API_KEY
+# menu: pick the clients present on this machine; scope is skipped (always global)
+ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + skills/
+```
+
+### 9.1 GitHub Copilot
+
+- [ ] Install line shows `installed via <path>` (CLI present) or
+      `wrote ~/.copilot/settings.json` (fallback when the CLI is missing)
+- [ ] `copilot plugin list` lists `deepseek-vl-support`
+- [ ] **R4 — mcp.json reading behavior**: in a Copilot session ask for a
+      screenshot description and confirm the `describe_image` MCP tool is
+      available and performs a REAL vision call. If tools never appear,
+      Copilot may only read its native `.mcp.json` (research gap R4) — copy
+      root `mcp.json` as `.mcp.json` in the plugin dir (harmless for the
+      other clients, they read the spec `mcp.json`).
+- [ ] Uninstall: `npx deepseek-vl-support uninstall --target plugin --clients copilot`,
+      then `copilot plugin list` no longer lists it
+
+### 9.2 Cursor
+
+- [ ] `~/.cursor/plugins/local/deepseek-vl-support/` exists with
+      `plugin.json` + `mcp.json` + `skills/` + the marker file
+- [ ] Cursor → Developer: Reload Window, then in a composer ask for a
+      screenshot description: the `deepseek-vision` skill / MCP tools are
+      discovered and work (real vision call)
+- [ ] Uninstall removes only the marked dir (a user-authored plugin dir
+      without the marker must survive — reported as skipped)
+
+### 9.3 Kiro (UI-only — no automation surface)
+
+- [ ] Follow the printed guidance: Kiro → Powers panel → Add Custom Power →
+      Import power from a folder → select `~/.deepseek-vl/plugin`
+- [ ] Ask for a screenshot description in a Kiro power session
+
+### 9.4 OpenClaw
+
+- [ ] `openclaw plugins install ~/.deepseek-vl/plugin` succeeded, then
+      `openclaw gateway restart`; install line reports both
+- [ ] `openclaw plugins list` lists `deepseek-vl-support`; in a session the
+      describe_image tool works against the real endpoint
+- [ ] Uninstall command **R2**: confirm `openclaw plugins uninstall
+      deepseek-vl-support` is the real command name (implemented from CLI
+      conventions, not yet confirmed on a real machine)
+
+### 9.5 Hermes Agent
+
+- [ ] `hermes plugins install limccn/deepseek-vl-support --no-enable` +
+      `hermes plugins enable deepseek-vl-support` succeeded
+- [ ] `hermes plugins list` shows it enabled; the `deepseek-vision` skill is
+      discoverable and describe_image performs a real vision call
+- [ ] Uninstall command **R2**: confirm `hermes plugins uninstall
+      deepseek-vl-support` is the real command name (same caveat as 9.4)
+
+### 9.6 R3 — bare `npx` resolution per client
+
+Record for each client above whether the MCP stdio subprocess resolves the
+bare `npx` from `mcp.json` (design gap R3). The package's `mcp` entry is the
+same `npx -y deepseek-vl-support mcp` shape already verified for Codex, and
+`npx` is the de-facto stdio convention, but a client whose MCP subprocess
+does NOT inherit the user PATH needs the fallback plan (design §2):
+`command: "node"` + `args: ["${PLUGIN_ROOT}/vendor/mcp-server.cjs"]` with a
+bundled single-file server committed to the repo. Record one line per client:
+`<client>: npx OK` or `<client>: needs node fallback`.
+
 ## Pass criteria
 
 - [ ] Steps 1–4 all match expectations (doctor exit code 0, describe returns a
@@ -107,4 +178,7 @@ git status                              # the project directory should be clean 
 - [ ] In a Claude Code session, after reading an image the model answers from
       the injected description (output shape consistent with the spike findings)
 - [ ] Codex `codex mcp list` shows the server and describe_image works
+- [ ] Agent Plugins: section 9 checks pass for every client present on the
+      test machine (skill discoverable + a real describe_image call), R3/R4
+      findings recorded, and R2 uninstall command names confirmed
 - [ ] No leftovers in the directory after uninstall

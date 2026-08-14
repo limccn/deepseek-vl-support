@@ -195,6 +195,49 @@ npx deepseek-vl-support@latest install --non-interactive \
   --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
 ```
 
+## Agent Plugins 模式（Copilot / Cursor / Kiro / OpenClaw / Hermes）
+
+除了 Claude Code 和 Codex，本包还以 [Agent Plugins v1.0.0](https://agent-plugins.org)
+可移植插件的形式发布（仓库根目录 `plugin.json` + `mcp.json` +
+`skills/deepseek-vision/SKILL.md`）。支持插件的智能体也可以获得视觉能力：
+`deepseek-vision` 技能 + `describe_image` / `vision_status` 两个 MCP 工具，
+共用同一套端点配置。
+
+```bash
+# 一键安装：把插件目录复制到 ~/.deepseek-vl/plugin/ 并注册到所选客户端
+#（菜单默认勾选检测到的客户端）
+npx deepseek-vl-support@latest install --target plugin
+
+# 非交互：用 --clients 明确指定客户端（默认全部）
+npx deepseek-vl-support@latest install --target plugin --clients copilot,cursor
+```
+
+各客户端行为：
+
+| 客户端 | 安装 | 验证 | 卸载 |
+|---|---|---|---|
+| GitHub Copilot | `copilot plugin install` + marketplace add（CLI 缺失时回退为写 `~/.copilot/settings.json` 的 `enabledPlugins`） | `copilot plugin list`，然后在会话里让它描述截图 | `copilot plugin uninstall deepseek-vl-support` |
+| Cursor | 复制插件目录到 `~/.cursor/plugins/local/deepseek-vl-support/`（带标记） | Developer → Reload Window 后技能 / MCP 服务器出现 | 重跑安装器的卸载（只删带标记的目录） |
+| Kiro | 手动——Kiro 没有命令行自动化入口 | Kiro → Powers 面板 → Add Custom Power → Import power from a folder → 选择 `~/.deepseek-vl/plugin` | 同一面板移除该 power |
+| OpenClaw | `openclaw plugins install ~/.deepseek-vl/plugin` + `openclaw gateway restart` | `openclaw plugins list`，然后让它描述截图 | `openclaw plugins uninstall deepseek-vl-support` |
+| Hermes Agent | `hermes plugins install limccn/deepseek-vl-support --no-enable` + `hermes plugins enable deepseek-vl-support` | `hermes plugins list`，确认技能可被发现 | `hermes plugins uninstall deepseek-vl-support` |
+
+单个客户端失败不会阻塞其他客户端——安装器逐客户端报告并给出指引（失败通常只是
+「重启应用」或一条手动命令）。
+
+插件客户端的配置是**环境变量或全局级别**：`install --target plugin` 总是写入
+`~/.deepseek-vl/config.json`（没有项目/全局选择），客户端启动的 MCP 子进程能看到
+`VISION_*` 环境变量。项目级 `.deepseek-vl/config.json` 对它们不可见——请用
+`npx deepseek-vl-support@latest config set <key> <value> --global` 或
+`VISION_BASE_URL` / `VISION_MODEL` / `VISION_API_KEY`。
+
+卸载会撤销注册并保留已物化的插件目录：
+
+```bash
+npx deepseek-vl-support@latest uninstall --target plugin              # 保留配置
+npx deepseek-vl-support@latest uninstall --target plugin --purge-config   # 连同配置/缓存一起删除
+```
+
 ## 开发者
 
 ```bash
