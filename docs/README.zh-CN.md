@@ -199,9 +199,12 @@ npx deepseek-vl-support@latest install --non-interactive \
 
 除了 Claude Code 和 Codex，本包还以 [Agent Plugins v1.0.0](https://agent-plugins.org)
 可移植插件的形式发布（仓库根目录 `plugin.json` + `mcp.json` +
-`skills/deepseek-vision/SKILL.md`）。支持插件的智能体也可以获得视觉能力：
+`skills/deepseek-vision/SKILL.md`）。
+支持插件的智能体也可以获得视觉能力：
 `deepseek-vision` 技能 + `describe_image` / `vision_status` 两个 MCP 工具，
-共用同一套端点配置。
+共用同一套端点配置。MCP 服务器以 `npx -y deepseek-vl-support mcp` 启动
+（环境需包含 npm/npx），并附带与 `mcp.json` 逐字节一致的 `.mcp.json`
+以适配 Copilot 的原生 MCP 约定。
 
 ```bash
 # 一键安装：把插件目录复制到 ~/.deepseek-vl/plugin/ 并注册到所选客户端

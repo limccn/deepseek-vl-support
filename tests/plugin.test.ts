@@ -1,9 +1,9 @@
 // Agent Plugins mode tests: static spec compliance of the portable package
-// (plugin.json / mcp.json / marketplace.json / skills/SKILL.md), materialized
-// plugin dir, and per-client registration/unregistration for GitHub Copilot,
-// Cursor, Kiro, OpenClaw, and Hermes against mocked CLIs on PATH. Also covers
-// the copilot settings.json fallback, dry-run (no writes, no commands),
-// failure isolation, and uninstall marker rules.
+// (plugin.json / mcp.json / .mcp.json / marketplace.json / skills/SKILL.md),
+// materialized plugin dir, and per-client registration/unregistration for
+// GitHub Copilot, Cursor, Kiro, OpenClaw, and Hermes against mocked CLIs on
+// PATH. Also covers the copilot settings.json fallback, dry-run (no writes,
+// no commands), failure isolation, and uninstall marker rules.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -103,11 +103,29 @@ test("static compliance: mcp.json is transport-valid, credential-free, and close
   assert.ok(!/[\s]/.test(server.command as string), "command must be a single executable token");
   const args = server.args as unknown[];
   assert.ok(Array.isArray(args) && args.every((a) => typeof a === "string"));
+  // Bare npx + package name: the client resolves npx via the platform's
+  // executable search; the npm package is fetched on first tool call. The
+  // user environment is assumed to include npm/npx (deliberate decision
+  // 2026-08-14 — see docs/e2e-real-endpoint.md §9.6 for the known risk).
+  assert.deepEqual(args, ["-y", "deepseek-vl-support", "mcp"]);
   assert.ok(!("env" in server), "no env entries (credentials stay in user config)");
   assert.ok(!("headers" in server), "no headers");
+  assert.ok(!("cwd" in server), "no cwd — clients use the plugin root by default");
   const secretish = /(api[_-]?key|secret|token|authorization|password|credential)/i;
   const serialized = JSON.stringify(server);
   assert.ok(!secretish.test(serialized), "no credential-like fields in mcp.json");
+});
+
+test("static compliance: .mcp.json is byte-identical to mcp.json (Copilot native file, build-synced)", () => {
+  const spec = readFileSync(join(ROOT, "mcp.json"), "utf8");
+  const copilot = readFileSync(join(ROOT, ".mcp.json"), "utf8");
+  assert.equal(
+    copilot,
+    spec,
+    ".mcp.json must stay in sync with mcp.json (build.mjs copies mcp.json → .mcp.json; edit mcp.json and re-run npm run build)",
+  );
+  const m = JSON.parse(copilot) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(m).sort(), ["$schema", "mcpServers"], ".mcp.json must also satisfy the closed schema");
 });
 
 test("static compliance: marketplace.json entry points at the repo root and matches plugin.json", () => {
@@ -144,9 +162,10 @@ test("materialize: copies plugin files into ~/.deepseek-vl/plugin/, idempotent, 
     const dest = pluginDir(home);
     const first = materializePluginDir(ROOT, dest, false);
     assert.deepEqual(first.missing, []);
-    assert.ok(first.written.length >= 3);
+    assert.equal(first.written.length, 4, "plugin.json + mcp.json + .mcp.json + skills/");
     assert.equal(readFileSync(join(dest, "plugin.json"), "utf8"), readFileSync(join(ROOT, "plugin.json"), "utf8"));
     assert.equal(readFileSync(join(dest, "mcp.json"), "utf8"), readFileSync(join(ROOT, "mcp.json"), "utf8"));
+    assert.equal(readFileSync(join(dest, ".mcp.json"), "utf8"), readFileSync(join(ROOT, ".mcp.json"), "utf8"));
     assert.ok(existsSync(join(dest, "skills", "deepseek-vision", "SKILL.md")));
     // idempotent: re-running succeeds and yields the same destination list
     const second = materializePluginDir(ROOT, dest, false);
@@ -281,6 +300,7 @@ test("install plugin: materializes, writes global config, and registers all clie
     const dest = pluginDir(home);
     assert.ok(existsSync(join(dest, "plugin.json")));
     assert.ok(existsSync(join(dest, "mcp.json")));
+    assert.ok(existsSync(join(dest, ".mcp.json")), "copilot-native .mcp.json materialized");
     assert.ok(existsSync(join(dest, "skills", "deepseek-vision", "SKILL.md")));
     assert.ok(report.output.some((l) => l.includes("materialized")), "materialization logged");
 

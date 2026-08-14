@@ -108,7 +108,7 @@ Prerequisite: the real endpoint configured (see step 0) and `npm run build`.
 ```bash
 npx deepseek-vl-support install --target plugin --preset openrouter --api-key $OPENROUTER_API_KEY
 # menu: pick the clients present on this machine; scope is skipped (always global)
-ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + skills/
+ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + .mcp.json + skills/
 ```
 
 ### 9.1 GitHub Copilot
@@ -116,19 +116,27 @@ ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + skills/
 - [ ] Install line shows `installed via <path>` (CLI present) or
       `wrote ~/.copilot/settings.json` (fallback when the CLI is missing)
 - [ ] `copilot plugin list` lists `deepseek-vl-support`
-- [ ] **R4 — mcp.json reading behavior**: in a Copilot session ask for a
-      screenshot description and confirm the `describe_image` MCP tool is
-      available and performs a REAL vision call. If tools never appear,
-      Copilot may only read its native `.mcp.json` (research gap R4) — copy
-      root `mcp.json` as `.mcp.json` in the plugin dir (harmless for the
-      other clients, they read the spec `mcp.json`).
+- [ ] **R4 — verified 2026-08-14 (Copilot CLI 1.0.59)**: skills ARE
+      discovered via spec semantics (`copilot plugin install` reports
+      "Installed 1 skill"). `copilot mcp list` NEVER lists plugin-sourced
+      servers — it only enumerates user `~/.copilot/mcp-config.json` and
+      the cwd `.mcp.json` — so it cannot prove or disprove plugin-MCP
+      registration either way. The package therefore ships `.mcp.json`
+      (Copilot's native MCP convention, byte-identical to `mcp.json`,
+      build-synced and committed), which closes the gap for Copilot while
+      remaining harmless for spec clients (they read `mcp.json`).
+- [ ] **Session-level check (needs `copilot auth`)**: on an authenticated
+      machine, in a Copilot session ask for a screenshot description and
+      confirm `describe_image` is available and performs a REAL vision call
+      — the remaining R4 verification (not possible on the 2026-08-14 box,
+      which was not signed in).
 - [ ] Uninstall: `npx deepseek-vl-support uninstall --target plugin --clients copilot`,
       then `copilot plugin list` no longer lists it
 
 ### 9.2 Cursor
 
 - [ ] `~/.cursor/plugins/local/deepseek-vl-support/` exists with
-      `plugin.json` + `mcp.json` + `skills/` + the marker file
+      `plugin.json` + `mcp.json` + `.mcp.json` + `skills/` + the marker file
 - [ ] Cursor → Developer: Reload Window, then in a composer ask for a
       screenshot description: the `deepseek-vision` skill / MCP tools are
       discovered and work (real vision call)
@@ -160,16 +168,29 @@ ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + skills/
 - [ ] Uninstall command **R2**: confirm `hermes plugins uninstall
       deepseek-vl-support` is the real command name (same caveat as 9.4)
 
-### 9.6 R3 — bare `npx` resolution per client
+### 9.6 R3 — stdio subprocess launch (KNOWN RISK: bare `npx` and raw spawns)
 
-Record for each client above whether the MCP stdio subprocess resolves the
-bare `npx` from `mcp.json` (design gap R3). The package's `mcp` entry is the
-same `npx -y deepseek-vl-support mcp` shape already verified for Codex, and
-`npx` is the de-facto stdio convention, but a client whose MCP subprocess
-does NOT inherit the user PATH needs the fallback plan (design §2):
-`command: "node"` + `args: ["${PLUGIN_ROOT}/vendor/mcp-server.cjs"]` with a
-bundled single-file server committed to the repo. Record one line per client:
-`<client>: npx OK` or `<client>: needs node fallback`.
+Verified 2026-08-14 (Windows Server 2022, Node v24): spawning the command
+line `npx -y deepseek-vl-support mcp` with `shell: false` (raw
+CreateProcess, what many MCP clients do) fails with **ENOENT** — npm
+installs `npx` as `npx`/`npx.cmd`/`npx.ps1` shims with no `npx.exe`, and a
+raw spawn does not apply PATHEXT. `shell: true` (cmd.exe PATHEXT
+resolution) works, but a client may spawn MCP stdio without a shell.
+
+**Decision (2026-08-14, user)**: keep bare `npx` in `mcp.json`/`.mcp.json`
+(`command: "npx"`, `args: ["-y", "deepseek-vl-support", "mcp"]`). The
+documented raw-spawn ENOENT finding stays as a KNOWN RISK, and the user
+environment is assumed to include npm/npx — the `node` +
+`${PLUGIN_ROOT}/vendor/mcp-server.cjs` fallback was REVERTED and no vendor
+bundle is shipped. Which of the 5 target clients spawn MCP stdio raw vs
+shelled is still unknown without their machines.
+
+Record for each client on its real machine that the MCP subprocess resolves
+the bare `npx` executable and starts the server:
+`<client>: npx launch OK`. If a client cannot resolve bare `npx` (raw
+spawn, no PATHEXT), note it here — the documented next step is re-triggering
+the R3 fallback (bundled `node` + `${PLUGIN_ROOT}` entry, spec §9.2
+expansion is guaranteed) for that client.
 
 ## Pass criteria
 
@@ -179,6 +200,8 @@ bundled single-file server committed to the repo. Record one line per client:
       the injected description (output shape consistent with the spike findings)
 - [ ] Codex `codex mcp list` shows the server and describe_image works
 - [ ] Agent Plugins: section 9 checks pass for every client present on the
-      test machine (skill discoverable + a real describe_image call), R3/R4
-      findings recorded, and R2 uninstall command names confirmed
+      test machine (skill discoverable + a real describe_image call), the
+      Copilot session-level R4 check completed on an authenticated machine,
+      bare `npx` launch confirmed per client (§9.6, or the risk triggered
+      for a client is documented), and R2 uninstall command names confirmed
 - [ ] No leftovers in the directory after uninstall

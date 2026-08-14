@@ -19,12 +19,17 @@ How to publish a new version of `deepseek-vl-support` to npm.
    - `"version"` in root `plugin.json`
    - `"version"` in root `marketplace.json` (top level `metadata.version`
      and the `plugins[0].version` entry)
-   Then regenerate the git-committed plugin skill copy and verify the static
+   Then regenerate the git-committed plugin artifacts and verify the static
    compliance tests still pass:
    ```bash
    npm run build        # copies assets/SKILL.md → skills/deepseek-vision/SKILL.md
+                        # and mcp.json → .mcp.json (Copilot's native MCP file)
    node --test "tests/plugin.test.ts"   # asserts all four version fields match
    ```
+   Commit the regenerated `skills/deepseek-vision/SKILL.md` and `.mcp.json`
+   together with the version bump: the git repo IS the plugin install source
+   for Copilot/Hermes, so the skill copy and `.mcp.json` must be in git
+   (dist/ is not).
    **Keep the single bin entry named after the package**:
    ```json
    "bin": { "deepseek-vl-support": "dist/cli.js" }
@@ -51,7 +56,7 @@ How to publish a new version of `deepseek-vl-support` to npm.
    npm pack --dry-run
    ```
    Expected contents (`files` whitelist: `dist/ assets/ skills/ plugin.json
-   mcp.json README.md LICENSE`):
+   mcp.json .mcp.json README.md LICENSE`):
    - `dist/cli.js` (ESM, shebang preserved, bin entry)
    - `dist/hook.cjs` (standalone single-file CJS bundle, zero deps, first-line
      banner carries the identity marker `/*! deepseek-vl-support-hook */`)
@@ -62,6 +67,8 @@ How to publish a new version of `deepseek-vl-support` to npm.
      git-based plugin installs ship it)
    - `plugin.json`, `mcp.json` (the Agent Plugins v1.0.0 package manifest and
      its MCP server config — the portable-plugin payload)
+   - `.mcp.json` (byte-identical to `mcp.json`; Copilot's native MCP
+     convention — R4 real-machine finding)
    - `README.md`, `LICENSE` — the package ships the English README only; the
      Chinese README lives at `docs/README.zh-CN.md` (docs/ is not packaged).
      Note: npm force-includes every root-level README* file regardless of the
@@ -130,6 +137,9 @@ How to publish a new version of `deepseek-vl-support` to npm.
 - [ ] `skills/deepseek-vision/SKILL.md` regenerated via `npm run build` and
       committed (git plugin installs ship it; the test asserts it equals
       assets/SKILL.md)
+- [ ] `.mcp.json` regenerated via `npm run build` and committed (git plugin
+      installs ship Copilot's native MCP file; the test asserts byte-identity
+      with mcp.json)
 - [ ] real-endpoint E2E (`e2e-real-endpoint.md`) passes at least once for describe + doctor
 - [ ] spike findings (plan-A block+additionalContext is visible to the model in
       Claude Code) are persisted

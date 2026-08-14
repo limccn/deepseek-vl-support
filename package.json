@@ -13,6 +13,7 @@
     "skills/",
     "plugin.json",
     "mcp.json",
+    ".mcp.json",
     "README.md",
     "LICENSE"
   ],

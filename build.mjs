@@ -1,6 +1,7 @@
-// Build script: bundles the CLI (ESM) and the standalone hook (CJS), and
-// copies src/assets templates into the package root `assets/` (shipped in
-// the npm package per package.json "files").
+// Build script: bundles the CLI (ESM) and the standalone hook (CJS); copies
+// src/assets templates into the package root `assets/` (shipped in the npm
+// package per package.json "files") and syncs the plugin-package copies that
+// git install sources must carry (skills/deepseek-vision/SKILL.md, .mcp.json).
 import { build } from "esbuild";
 import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -44,4 +45,10 @@ await cp(join(root, "src/assets"), join(root, "assets"), { recursive: true });
 await mkdir(join(root, "skills", "deepseek-vision"), { recursive: true });
 await cp(join(root, "assets", "SKILL.md"), join(root, "skills", "deepseek-vision", "SKILL.md"));
 
-console.log("build ok: dist/cli.js + dist/hook.cjs + assets/ + skills/deepseek-vision/SKILL.md");
+// Copilot's native MCP convention reads .mcp.json, not the spec mcp.json
+// (real-machine finding R4). Ship a byte-identical copy at the repo root,
+// synced here and committed to git (the repo is a Copilot install source).
+// Spec clients ignore it; Copilot gets its native file.
+await cp(join(root, "mcp.json"), join(root, ".mcp.json"));
+
+console.log("build ok: dist/cli.js + dist/hook.cjs + assets/ + skills/deepseek-vision/SKILL.md + .mcp.json");

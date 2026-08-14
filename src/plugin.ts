@@ -189,7 +189,9 @@ export function detectPluginClients(
 
 // ---------------------------------------------------------------- materialize
 
-const PLUGIN_PACKAGE_FILES = ["plugin.json", "mcp.json", "skills"];
+// .mcp.json: Copilot's native MCP convention (byte-identical to mcp.json,
+// build-synced — real-machine finding R4).
+const PLUGIN_PACKAGE_FILES = ["plugin.json", "mcp.json", ".mcp.json", "skills"];
 
 export interface MaterializeResult {
   written: string[]; // destination paths written (or that would be written)

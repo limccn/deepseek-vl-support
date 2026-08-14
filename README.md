@@ -208,11 +208,13 @@ npx deepseek-vl-support@latest install --non-interactive \
 ## Agent Plugins mode (Copilot / Cursor / Kiro / OpenClaw / Hermes)
 
 Beyond Claude Code and Codex, the package ships as a portable
-[Agent Plugins v1.0.0](https://agent-plugins.org) package (root
-`plugin.json` + `mcp.json` + `skills/deepseek-vision/SKILL.md`), so agents that
-load plugins get vision too — the `deepseek-vision` skill plus the
+[Agent Plugins v1.0.0](https://agent-plugins.org) package (root `plugin.json`
++ `mcp.json` + `skills/deepseek-vision/SKILL.md`), so agents that load
+plugins get vision too — the `deepseek-vision` skill plus the
 `describe_image` / `vision_status` MCP tools backed by the same endpoint
-configuration.
+configuration. The MCP server is launched as `npx -y deepseek-vl-support
+mcp` (your environment needs npm/npx), and a `.mcp.json` copy of the server
+config is shipped for Copilot's native MCP convention.
 
 ```bash
 # one-shot installer: copies the plugin dir to ~/.deepseek-vl/plugin/ and
