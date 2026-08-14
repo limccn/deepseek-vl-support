@@ -6,7 +6,10 @@ import { join } from "node:path";
 import { describe, VisionSizeError } from "./client.ts";
 import { runDoctor } from "./doctor.ts";
 import { runInstall, runUninstall } from "./install.ts";
+import type { InstallTarget } from "./install.ts";
 import { runMcpServer } from "./mcp.ts";
+import { PLUGIN_CLIENTS } from "./plugin.ts";
+import type { PluginClient } from "./plugin.ts";
 import {
   humanBytes,
   maskApiKey,
@@ -18,7 +21,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.1.3";
+const VERSION = "0.2.0";
 
 interface ParsedArgs {
   flags: Map<string, string>;
@@ -34,6 +37,7 @@ const VALUE_FLAGS = new Set([
   "model",
   "api-key",
   "fallbacks",
+  "clients",
   "dir",
   "url",
 ]);
@@ -88,10 +92,12 @@ Usage:
   deepseek-vl-support mcp                                  Run the MCP stdio server (for Codex)
   deepseek-vl-support version                              Print version
 
-install options: --target claude|codex|both --global --update --dry-run
+install options: --target claude|codex|both|plugin --global --update --dry-run
                  --non-interactive --preset <id> --base-url <url> --model <id>
                  --api-key <key> --fallbacks <json|"m@url,..."> --dir <project>
-uninstall options: --target claude|codex|both --global --purge-config --dry-run
+                 --clients copilot,cursor,kiro,openclaw,hermes (plugin target)
+uninstall options: --target claude|codex|both|plugin --global --purge-config
+                 --dry-run --clients <list> (plugin target)
 
 Config resolution: env VISION_* > project .deepseek-vl/config.json >
 global ~/.deepseek-vl/config.json > defaults.
@@ -256,17 +262,33 @@ function flagBool(flags: Map<string, string>, name: string): boolean {
   return v === "" || !["0", "false", "no", "off"].includes(v.toLowerCase());
 }
 
+/** Parse --clients copilot,cursor,... (comma-separated). */
+function parseClients(raw: string | undefined): PluginClient[] | undefined {
+  if (raw === undefined || raw === "") return undefined;
+  const out: PluginClient[] = [];
+  for (const part of raw.split(",")) {
+    const c = part.trim().toLowerCase();
+    if (!(PLUGIN_CLIENTS as readonly string[]).includes(c)) {
+      fail(`unknown client: ${c} (expected one of: ${PLUGIN_CLIENTS.join(",")})`);
+    }
+    out.push(c as PluginClient);
+  }
+  return out;
+}
+
+const TARGETS: readonly InstallTarget[] = ["claude", "codex", "both", "plugin"];
+
 async function runInstallFromCli(args: ParsedArgs): Promise<void> {
   const { flags } = args;
   const target = flags.get("target");
-  if (target !== undefined && !["claude", "codex", "both"].includes(target)) {
-    fail(`--target must be claude|codex|both, got: ${target}`);
+  if (target !== undefined && !(TARGETS as readonly string[]).includes(target)) {
+    fail(`--target must be ${TARGETS.join("|")}, got: ${target}`);
   }
   const cwd = flags.get("dir") ?? process.cwd();
   const report = await runInstall({
     cwd,
     global: flagBool(flags, "global"),
-    target: (target as "claude" | "codex" | "both") ?? "both",
+    target: (target as InstallTarget) ?? "both",
     nonInteractive: flagBool(flags, "non-interactive"),
     update: flagBool(flags, "update"),
     dryRun: flagBool(flags, "dry-run"),
@@ -275,6 +297,7 @@ async function runInstallFromCli(args: ParsedArgs): Promise<void> {
     model: flags.get("model"),
     apiKey: flags.get("api-key"),
     fallbacks: flags.get("fallbacks") !== undefined ? parseFallbacks(flags.get("fallbacks") as string) : undefined,
+    clients: parseClients(flags.get("clients")),
   });
   process.stdout.write(report.output.join("\n") + "\n");
   if (report.doctor && !report.doctor.ok) process.exitCode = 1;
@@ -283,14 +306,15 @@ async function runInstallFromCli(args: ParsedArgs): Promise<void> {
 async function runUninstallFromCli(args: ParsedArgs): Promise<void> {
   const { flags } = args;
   const target = flags.get("target");
-  if (target !== undefined && !["claude", "codex", "both"].includes(target)) {
-    fail(`--target must be claude|codex|both, got: ${target}`);
+  if (target !== undefined && !(TARGETS as readonly string[]).includes(target)) {
+    fail(`--target must be ${TARGETS.join("|")}, got: ${target}`);
   }
   const cwd = flags.get("dir") ?? process.cwd();
   const report = await runUninstall({
     cwd,
     global: flagBool(flags, "global"),
-    target: (target as "claude" | "codex" | "both") ?? "both",
+    target: (target as InstallTarget) ?? "both",
+    clients: parseClients(flags.get("clients")),
     purgeConfig: flagBool(flags, "purge-config"),
     dryRun: flagBool(flags, "dry-run"),
   });

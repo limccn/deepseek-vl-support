@@ -54,6 +54,44 @@ export async function askMenu(spec: MenuSpec): Promise<string> {
   }
 }
 
+export interface MultiMenuSpec {
+  prompt: string;
+  options: MenuOption[];
+  default?: string[];
+}
+
+/** Ask a numbered multi-select. Accepts comma/space-separated numbers or
+ *  "all"; Enter returns the default selection. */
+export async function askMultiMenu(spec: MultiMenuSpec): Promise<string[]> {
+  const rl = makeRl();
+  try {
+    for (;;) {
+      const lines = [spec.prompt];
+      spec.options.forEach((opt, i) => {
+        const marker = spec.default?.includes(opt.value) ? " (default)" : "";
+        lines.push(`  ${i + 1}) ${opt.label}${marker}`);
+      });
+      lines.push(`> Select (comma-separated numbers${spec.default?.length ? ", Enter=default" : ""}): `);
+      const answer = (await rl.question(lines.join("\n"))).trim().toLowerCase();
+      if (answer === "" && spec.default !== undefined && spec.default.length) return [...spec.default];
+      if (answer === "all") return spec.options.map((o) => o.value);
+      const picks = answer
+        .split(/[,\s]+/)
+        .filter(Boolean)
+        .map(Number);
+      if (
+        picks.length > 0 &&
+        picks.every((n) => Number.isInteger(n) && n >= 1 && n <= spec.options.length)
+      ) {
+        return picks.map((n) => spec.options[n - 1].value);
+      }
+      output.write(`Invalid choice, please select again.\n`);
+    }
+  } finally {
+    rl.close();
+  }
+}
+
 /** Ask a free-text question; Enter returns the default. */
 export async function askInput(spec: InputSpec): Promise<string> {
   const rl = makeRl();

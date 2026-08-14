@@ -31,5 +31,15 @@ export const AGENTS_END_MARKER = "<!-- deepseek-vl:end -->";
 
 export const GITIGNORE_ENTRY = ".deepseek-vl/";
 
+// Agent Plugins portable package (src/plugin.ts)
+export const PLUGIN_DIRNAME = "plugin"; // ~/.deepseek-vl/plugin/ (materialized plugin dir)
+export const PLUGIN_REPO = "https://github.com/limccn/deepseek-vl-support";
+export const PLUGIN_GITHUB_SLUG = "limccn/deepseek-vl-support";
+// Cursor local plugin dir name + marker file inside it (uninstall only
+// removes the directory when the marker is present)
+export const CURSOR_PLUGIN_DIRNAME = "deepseek-vl-support";
+export const CURSOR_PLUGIN_MARKER_FILE = ".deepseek-vl-managed";
+export const CURSOR_PLUGIN_MARKER = "deepseek-vl-support:managed";
+
 // Total vision budget inside the hook (hook timeout is 60s; leave a buffer)
 export const HOOK_BUDGET_MS = 50_000;

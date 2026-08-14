@@ -37,4 +37,11 @@ await Promise.all([
 await rm(join(root, "assets"), { recursive: true, force: true });
 await cp(join(root, "src/assets"), join(root, "assets"), { recursive: true });
 
-console.log("build ok: dist/cli.js + dist/hook.cjs + assets/");
+// Agent Plugins portable package: skills/deepseek-vision/SKILL.md at the
+// package root is the plugin copy of the skill (git-installed plugins ship
+// it directly). Single source stays src/assets/SKILL.md; this copy is the
+// build-time sync point and is committed to git.
+await mkdir(join(root, "skills", "deepseek-vision"), { recursive: true });
+await cp(join(root, "assets", "SKILL.md"), join(root, "skills", "deepseek-vision", "SKILL.md"));
+
+console.log("build ok: dist/cli.js + dist/hook.cjs + assets/ + skills/deepseek-vision/SKILL.md");
