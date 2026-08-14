@@ -130,29 +130,98 @@ ls ~/.deepseek-vl/plugin/            # plugin.json + mcp.json + .mcp.json + skil
 - [x] `npm pack --dry-run`: tarball contains `plugin.json`, `mcp.json`,
       `.mcp.json`, `skills/deepseek-vision/SKILL.md`, `assets/`, `dist/`;
       excludes `marketplace.json`, `tests/`, `src/`, `docs/`, `.trellis/`.
-- [ ] Not verifiable on this box (no auth / client not installed): §9.1
-      session-level R4 check (needs `copilot auth`), §9.2–9.5 and 9.7–9.10
-      client machines, R2 uninstall command names.
+- [ ] Still open after the 0.2.1 run: §9.1 session-level R4 check (copilot
+      IS signed in on this box, but the account's model returns CAPI 400 —
+      see §9.0.1), §9.2–9.5 and 9.7–9.10 client machines, R2 uninstall
+      command names.
+
+### 9.0.1 0.2.1 record — R5 fix + real-machine re-verification (2026-08-14)
+
+Endpoint used throughout: **Moonshot** `https://api.moonshot.cn/v1`,
+model `moonshot-v1-32k-vision-preview` (12 models listed by `/models`).
+`doctor` timed out twice on first contact (120s abort); every immediate
+retry succeeded — recorded as an environment note (cold CDN path), not a
+defect.
+
+- [x] **0.2.1 published** (R5 fix, see below): `npm run verify` 102/102
+      green; `npm pack --dry-run` → 14 files, version 0.2.1, manifest
+      matches the whitelist; registry `npm view deepseek-vl-support
+      version` → `0.2.1`; post-publish smoke outside the package
+      (`npx -y deepseek-vl-support@0.2.1 version` → 0.2.1); stale global
+      install refreshed to 0.2.1. 0.2.0 stays published (deprecate is the
+      maintainer's call).
+- [x] **R5 — installer shim-selection defect (found by the 0.2.0 Copilot
+      E2E)**: on Windows, npm global installs create three shims per CLI
+      (`copilot`, `copilot.cmd`, `copilot.ps1`). `findOnPath` probed
+      extensions `["", ".cmd", ".exe", ".bat"]`, so it resolved the
+      **extensionless POSIX sh script first**; raw `spawn` (no shell) →
+      CreateProcess ENOENT → `copilot plugin install` failed on every
+      Windows machine with npm-installed client CLIs. Mock tests only
+      created `.cmd` shims, which masked it. **Fix (0.2.1)**: probe order
+      `.exe` → `.cmd` → `.bat` → extensionless last (PATHEXT-consistent)
+      on win32, plus a regression test with real npm shim shapes
+      (extensionless + `.cmd` siblings). Re-verified on the real machine:
+      the 0.2.1 installer resolved
+      `C:\Users\limc\AppData\Roaming\npm\copilot.cmd` and reported
+      `[copilot] ok`.
+- [x] **Claude Code (clean-room, real endpoint)**: hook installed
+      (`.claude/settings.json` PreToolUse(Read) + SessionStart entries,
+      hook file present), SessionStart hook protocol check passes, real
+      MCP `describe_image` call in a running Claude Code session returned
+      a description matching the test PNG's known content. OPEN user step:
+      restart a session and confirm the model answers from the injected
+      `[Vision of <file>]:` description + `/vision` works. The E2E project
+      was cleaned up — one-liner to try it in any project:
+      `npx -y deepseek-vl-support@0.2.1 install --non-interactive --target
+      claude --base-url https://api.moonshot.cn/v1 --model
+      moonshot-v1-32k-vision-preview --api-key <key>`.
+- [x] **Codex: skipped as a todo (user decision)**. 0.142.5 does not load
+      project-scope `.codex/config.toml` MCP without project trust;
+      `-c` override proves the config valid. Non-interactive `codex exec`
+      loads the MCP tools but cannot approve tool calls. An interactive
+      session on the user's machine remains open.
+- [x] **Copilot (static)**: `copilot plugin list` lists
+      `deepseek-vl-support` — labeled `v0.2.0` because Copilot resolves the
+      plugin version from the **GitHub marketplace** (repo `plugin.json`
+      on `main`; the 0.2.1 commits were not yet pushed at check time), while
+      the materialized `~/.deepseek-vl/plugin/plugin.json` was 0.2.1.
+      `copilot mcp list` shows `Workspace servers: deepseek-vl (local)` —
+      plugin-sourced MCP IS discovered (see the §9.1 correction).
+- [ ] **Copilot session-level R4: skipped as a todo (user decision)**.
+      Headless `copilot -p` fails for ANY prompt with
+      `CAPIError: 400 The requested model is not supported` (baseline
+      `"say hi"` fails identically) — an account-side model configuration
+      issue, not the plugin (no model key in `~/.copilot/config.json` to
+      override; interactive sessions on a Copilot-enabled account remain
+      the user-side check).
+- [x] **Cleanup**: `uninstall --target claude,codex,copilot
+      --purge-config` removed all artifacts (hook entries/file/skill/
+      command; `.codex/config.toml` MCP section + AGENTS.md block +
+      `.agents/skills/`; copilot CLI uninstall + `settings.json` entries;
+      `~/.deepseek-vl` deleted) and the E2E sandbox dir was removed.
 
 ### 9.1 GitHub Copilot
 
 - [ ] Install line shows `installed via <path>` (CLI present) or
       `wrote ~/.copilot/settings.json` (fallback when the CLI is missing)
 - [ ] `copilot plugin list` lists `deepseek-vl-support`
-- [ ] **R4 — verified 2026-08-14 (Copilot CLI 1.0.59)**: skills ARE
+- [x] **R4 — verified 2026-08-14 (Copilot CLI 1.0.59)**: skills ARE
       discovered via spec semantics (`copilot plugin install` reports
-      "Installed 1 skill"). `copilot mcp list` NEVER lists plugin-sourced
-      servers — it only enumerates user `~/.copilot/mcp-config.json` and
-      the cwd `.mcp.json` — so it cannot prove or disprove plugin-MCP
-      registration either way. The package therefore ships `.mcp.json`
-      (Copilot's native MCP convention, byte-identical to `mcp.json`,
-      build-synced and committed), which closes the gap for Copilot while
-      remaining harmless for spec clients (they read `mcp.json`).
-- [ ] **Session-level check (needs `copilot auth`)**: on an authenticated
-      machine, in a Copilot session ask for a screenshot description and
-      confirm `describe_image` is available and performs a REAL vision call
-      — the remaining R4 verification (not possible on the 2026-08-14 box,
-      which was not signed in).
+      "Installed 1 skill"). With the plugin installed, `copilot mcp list`
+      DOES list the plugin's MCP server —
+      `Workspace servers: deepseek-vl (local)` (observed 2026-08-14 in a
+      cwd with no `.mcp.json` and no `~/.copilot/mcp-config.json` entry,
+      so the only known source is the installed plugin — this supersedes
+      the earlier claim that plugin-sourced servers never appear). The
+      package still ships `.mcp.json` (Copilot's native MCP convention,
+      byte-identical to `mcp.json`, build-synced and committed) as the
+      spec-native discovery file.
+- [ ] **Session-level check**: on a Copilot-enabled account, in a Copilot
+      session ask for a screenshot description and confirm `describe_image`
+      is available and performs a REAL vision call. Open as a todo: the
+      2026-08-14 box IS signed in, but every headless `copilot -p` prompt
+      fails with `CAPIError: 400 The requested model is not supported`
+      (account-side model config, baseline `"say hi"` fails identically).
 - [ ] Uninstall: `npx deepseek-vl-support uninstall --target copilot`,
       then `copilot plugin list` no longer lists it
 
