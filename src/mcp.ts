@@ -8,7 +8,7 @@ import { describe, listModels, modelIdMatches, VisionSizeError } from "./client.
 import { humanBytes, maskApiKey, resolveConfig } from "./config.ts";
 import { PKG_NAME } from "./identity.ts";
 
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.2.1";
 const PROTOCOL_VERSION = "2024-11-05";
 
 interface JsonRpcRequest {

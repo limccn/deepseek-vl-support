@@ -193,10 +193,15 @@ function runCmd(
 
 // ---------------------------------------------------------------- detection
 
-/** Resolve a bare executable name against PATH (Windows tries .cmd/.exe). */
+/** Resolve a bare executable name against PATH. On Windows, real executable
+ *  extensions come first (PATHEXT order): npm installs an extensionless
+ *  POSIX sh shim next to `.cmd`/`.ps1` shims, and raw-spawning the sh script
+ *  fails CreateProcess with ENOENT (R5 real-machine finding) — so a `.cmd`
+ *  sibling must win over the extensionless file. The extensionless probe
+ *  stays last as the fallback for true extensionless executables. */
 export function findOnPath(name: string, env: NodeJS.ProcessEnv): string | null {
   const pathVar = env.PATH ?? env.Path ?? "";
-  const exts = process.platform === "win32" ? ["", ".cmd", ".exe", ".bat"] : [""];
+  const exts = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
   for (const dir of pathVar.split(delimiter)) {
     if (!dir) continue;
     for (const ext of exts) {

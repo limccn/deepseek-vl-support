@@ -207,6 +207,17 @@ test("detection: PATH probe for CLI clients, directory probe for cursor/kiro", a
     assert.equal(det.openclaw.detected, false, "openclaw not on PATH");
     assert.equal(det.cursor.detected, true, "cursor via ~/.cursor");
     assert.equal(det.kiro.detected, false, "kiro via ~/.kiro");
+
+    // R5 regression: npm ships an extensionless POSIX sh shim next to the
+    // .cmd shim; the probe must prefer the executable extension (raw-spawning
+    // the sh script fails CreateProcess with ENOENT on a real machine).
+    if (process.platform === "win32") {
+      await writeFile(join(binDir, "grok"), "#!/bin/sh\necho sh\n", "utf8");
+      await writeFile(join(binDir, "grok.cmd"), "@echo off\n", "utf8");
+      const det2 = detectPluginClients(home, env);
+      assert.equal(det2.grok.detected, true);
+      assert.equal(det2.grok.bin, join(binDir, "grok.cmd"), "prefer the .cmd sibling over the extensionless sh shim");
+    }
   } finally {
     await rm(base, { recursive: true, force: true });
   }
