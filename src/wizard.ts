@@ -25,11 +25,14 @@ function makeRl() {
   return createInterface({ input, output });
 }
 
-function formatMenu(spec: MenuSpec): string {
+/** Render a numbered single-select menu. The default is conveyed by the
+ *  `[value]` hint in the prompt line only — no per-option "(default)"
+ *  markers (R5: options show pure labels, the Enter=default hint carries
+ *  the default). Exported for tests. */
+export function formatMenu(spec: MenuSpec): string {
   const lines = [spec.prompt];
   spec.options.forEach((opt, i) => {
-    const marker = opt.value === spec.default ? " (default)" : "";
-    lines.push(`  ${i + 1}) ${opt.label}${marker}`);
+    lines.push(`  ${i + 1}) ${opt.label}`);
   });
   const def = spec.default ? ` [${spec.default}]` : "";
   lines.push(`> Select (1-${spec.options.length}${def}): `);
@@ -60,19 +63,25 @@ export interface MultiMenuSpec {
   default?: string[];
 }
 
+/** Render a numbered multi-select. The default is conveyed by the
+ *  "Enter=default" hint only — no per-option "(default)" markers (R5).
+ *  Exported for tests. */
+export function formatMultiMenu(spec: MultiMenuSpec): string {
+  const lines = [spec.prompt];
+  spec.options.forEach((opt, i) => {
+    lines.push(`  ${i + 1}) ${opt.label}`);
+  });
+  lines.push(`> Select (comma-separated numbers${spec.default?.length ? ", Enter=default" : ""}): `);
+  return lines.join("\n");
+}
+
 /** Ask a numbered multi-select. Accepts comma/space-separated numbers or
  *  "all"; Enter returns the default selection. */
 export async function askMultiMenu(spec: MultiMenuSpec): Promise<string[]> {
   const rl = makeRl();
   try {
     for (;;) {
-      const lines = [spec.prompt];
-      spec.options.forEach((opt, i) => {
-        const marker = spec.default?.includes(opt.value) ? " (default)" : "";
-        lines.push(`  ${i + 1}) ${opt.label}${marker}`);
-      });
-      lines.push(`> Select (comma-separated numbers${spec.default?.length ? ", Enter=default" : ""}): `);
-      const answer = (await rl.question(lines.join("\n"))).trim().toLowerCase();
+      const answer = (await rl.question(formatMultiMenu(spec))).trim().toLowerCase();
       if (answer === "" && spec.default !== undefined && spec.default.length) return [...spec.default];
       if (answer === "all") return spec.options.map((o) => o.value);
       const picks = answer

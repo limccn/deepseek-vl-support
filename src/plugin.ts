@@ -59,19 +59,26 @@ export const PLUGIN_CLIENTS: readonly PluginClient[] = [
   "other",
 ];
 
-/** Every agent the installer can target: the two native integrations plus
- *  the ten Agent Plugins plugin clients. */
-export type Agent = "claude" | "codex" | PluginClient;
+/** Every agent the installer can target: the three native integrations
+ *  (claude/codex/opencode), the three skill-copy consumers (trae/pi/dsh,
+ *  registered in src/skillagents.ts), and the ten Agent Plugins plugin
+ *  clients. */
+export type Agent = "claude" | "codex" | "opencode" | "trae" | "pi" | "dsh" | PluginClient;
 
-export type AgentKind = "native" | "plugin";
+export type AgentKind = "native" | "plugin" | "skill";
 
 /** Declarative kind table — the single source of truth for which agents are
- *  native integrations vs Agent Plugins clients. TypeScript enforces
- *  completeness (adding an Agent without a kind is a compile error), so the
- *  old name-comparison isPluginAgent cannot silently miss a new agent. */
+ *  native integrations, Agent Plugins clients, or skill-copy consumers.
+ *  TypeScript enforces completeness (adding an Agent without a kind is a
+ *  compile error), so the old name-comparison isPluginAgent cannot silently
+ *  miss a new agent. */
 export const AGENT_KINDS: Record<Agent, AgentKind> = {
   claude: "native",
   codex: "native",
+  opencode: "native",
+  trae: "skill",
+  pi: "skill",
+  dsh: "skill",
   copilot: "plugin",
   cursor: "plugin",
   kiro: "plugin",
@@ -84,7 +91,9 @@ export const AGENT_KINDS: Record<Agent, AgentKind> = {
   other: "plugin",
 };
 
-export const AGENTS: readonly Agent[] = ["claude", "codex", ...PLUGIN_CLIENTS];
+// CLI-class agents first (native, then skill-copy), plugin clients after:
+// the wizard groups them in the same order.
+export const AGENTS: readonly Agent[] = ["claude", "codex", "opencode", "trae", "pi", "dsh", ...PLUGIN_CLIENTS];
 
 export function isPluginAgent(a: Agent): a is PluginClient {
   return AGENT_KINDS[a] === "plugin";
@@ -101,6 +110,19 @@ export const PLUGIN_CLIENT_LABELS: Record<PluginClient, string> = {
   grok: "Grok Bot",
   nanoclaw: "NanoClaw",
   other: "Other agents (Agent Plugins open standard)",
+};
+
+/** Pure-name labels for every agent in the wizard menu (R5: no detection
+ *  annotations, no explanatory parentheses). Plugin clients reuse their
+ *  existing labels (the `other` label is descriptive, not an annotation). */
+export const AGENT_LABELS: Record<Agent, string> = {
+  claude: "Claude Code",
+  codex: "Codex",
+  opencode: "OpenCode",
+  trae: "Trae",
+  pi: "Pi Coding Agent",
+  dsh: "DeepSeek Harness",
+  ...PLUGIN_CLIENT_LABELS,
 };
 
 export type PluginClientStatus = "ok" | "skipped" | "failed" | "manual";
@@ -270,6 +292,14 @@ const CLIENT_DETECTORS: Partial<Record<PluginClient, ClientDetector>> = {
   kiro: dirDetector("Kiro", (h) => join(h, ".kiro")),
   // other: no detection surface — always guidance-only
 };
+
+/** Whether the client has a real detector entry (`other` — and any future
+ *  guidance-only client — does not: detectPluginClients reports it as
+ *  undetected with a synthetic "no detection surface" reason, so callers
+ *  that want to distinguish "not detected" from "not detectable" must ask). */
+export function clientHasDetector(c: PluginClient): boolean {
+  return CLIENT_DETECTORS[c] !== undefined;
+}
 
 /** Detect which of the 10 clients is available on this machine. CLI clients
  *  are probed via PATH; GUI clients via their config directory in the user

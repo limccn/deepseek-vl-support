@@ -1,5 +1,6 @@
 // Installer: numbered-menu wizard (interactive) or flags/env (CI). A single
-// flat agent list of 12 targets — claude, codex (native installs: Claude Code
+// flat agent list of 16 targets — claude, codex, opencode (native installs:
+// Claude Code
 // hook + skill + slash command + settings.json deep-merge; Codex config.toml
 // MCP section + AGENTS.md block + models.json fix + project-scope
 // .agents/skills/ write) and copilot, cursor, kiro, openclaw, hermes, vscode,
@@ -44,21 +45,32 @@ import {
   SKILL_DIRNAME,
   SKILL_MARKER,
 } from "./identity.ts";
-import { packageRoot, packagedHookPath, packagedSkillPath, templatePath } from "./paths.ts";
+import { packageRoot, packagedHookPath, templatePath } from "./paths.ts";
 import {
+  AGENT_KINDS,
+  AGENT_LABELS,
   AGENTS,
+  clientHasDetector,
   detectPluginClients,
   installPluginClients,
   isPluginAgent,
   materializePluginDir,
   pluginDir,
   uninstallPluginClients,
-  PLUGIN_CLIENT_LABELS,
   PLUGIN_CLIENTS,
 } from "./plugin.ts";
 import type { Agent, PluginClient } from "./plugin.ts";
+import {
+  detectSkillModuleAgents,
+  installSkillAgents,
+  NOT_DETECTED_HINTS,
+  SKILL_MODULE_AGENTS,
+  uninstallSkillAgents,
+  writeSharedAgentsSkill,
+} from "./skillagents.ts";
+import type { SkillModuleAgent } from "./skillagents.ts";
 import { askInput, askMenu, askMultiMenu, askSecret } from "./wizard.ts";
-import type { MultiMenuSpec } from "./wizard.ts";
+import type { MenuSpec, MultiMenuSpec } from "./wizard.ts";
 
 export type AgentStatus = "ok" | "skipped" | "failed" | "manual";
 
@@ -94,31 +106,68 @@ export function parseTargets(raw: string | undefined): Agent[] {
   return [...new Set(out)];
 }
 
-/** Build the wizard's first step: ONE multi-select of all 12 agents with
- *  per-client detection annotations (plugin clients not found on this
- *  machine are flagged "not detected — manual instructions"; `other` is
- *  guidance-only and never annotated). This replaces the old single-choice
- *  target menu (claude/codex/both/plugin) and the separate plugin-client
- *  step. Exported for tests. */
+/** Build the wizard's first step: ONE multi-select of all 16 agents with
+ *  pure-name labels (R5: no detection annotations, no explanatory
+ *  parentheses). The default is claude + codex plus every agent detected on
+ *  this machine (plugin clients and the skill-module agents
+ *  opencode/trae/pi/dsh). Selected-but-undetected agents are warned about
+ *  later, at install time (runInstall). Exported for tests. */
 export function agentMenuSpec(home: string, env: NodeJS.ProcessEnv = process.env): MultiMenuSpec {
   const detected = detectPluginClients(home, env);
+  const skillDetected = detectSkillModuleAgents(home, env);
   return {
     prompt: "Which agents should get vision?",
-    options: AGENTS.map((a) => ({
-      value: a,
-      label: isPluginAgent(a)
-        ? a === "other"
-          ? PLUGIN_CLIENT_LABELS[a]
-          : `${PLUGIN_CLIENT_LABELS[a]}${detected[a].detected ? "" : " (not detected — manual instructions)"}`
-        : a === "claude"
-          ? "Claude Code (hooks intercept Read automatically)"
-          : "Codex (also writes .agents/skills/ — usable by Cursor, GitHub Copilot, Kimi Code, etc.)",
-    })),
-    // Default: the former "both" default (claude + codex) plus the plugin
-    // clients detected on this machine (the former plugin-mode default).
-    default: ["claude", "codex", ...PLUGIN_CLIENTS.filter((c) => detected[c].detected)],
+    options: AGENTS.map((a) => ({ value: a, label: AGENT_LABELS[a] })),
+    default: [
+      "claude",
+      "codex",
+      ...PLUGIN_CLIENTS.filter((c) => detected[c].detected),
+      ...SKILL_MODULE_AGENTS.filter((a) => skillDetected[a].detected),
+    ],
   };
 }
+
+/** True when the wizard asks the install-scope question: any native agent
+ *  (claude/codex/opencode) is selected. Skill agents (trae/pi/dsh) are
+ *  project-level only and plugin clients are always global. Exported for
+ *  tests. */
+export function needsScopeQuestion(targets: Agent[]): boolean {
+  return targets.some((a) => AGENT_KINDS[a] === "native");
+}
+
+/** Step 2 menu spec: the endpoint presets plus the "Decide later" escape
+ *  hatch (R4), which is NOT a real preset — presetById("later") stays
+ *  undefined; non-interactive --preset later is handled separately.
+ *  Exported for tests. */
+export function presetMenuSpec(seed: InstallOptions, env: NodeJS.ProcessEnv): MenuSpec {
+  return {
+    prompt: "Vision endpoint preset",
+    options: [...PRESETS.map((p) => ({ value: p.id, label: p.label })), { value: "later", label: "Decide later" }],
+    default: seed.preset ?? env.DVLS_PRESET ?? "openrouter",
+  };
+}
+
+/** Step 7 menu spec: the install-scope question. Project is first and the
+ *  default (R3); the "(recommended)" marker is the one R5 exception to the
+ *  pure-label rule. Exported for tests. */
+export function scopeMenuSpec(seed: InstallOptions): MenuSpec {
+  return {
+    prompt: "Install scope",
+    options: [
+      { value: "project", label: "Project (recommended, this directory)" },
+      { value: "global", label: "Global (all projects)" },
+    ],
+    default: seed.global ? "global" : "project",
+  };
+}
+
+/** Warning block shown when the user picks "Decide later" (R4): vision stays
+ *  off until a model is configured. */
+export const DECIDE_LATER_WARNING =
+  `⚠ Vision not configured: images cannot be described until a model is set.\n` +
+  `  Later: npx ${PKG_NAME} config set baseUrl <url> [--global]\n` +
+  `         npx ${PKG_NAME} config set model <id> [--global]\n` +
+  `         (or VISION_BASE_URL / VISION_MODEL environment variables)`;
 
 export interface Preset {
   id: string;
@@ -154,10 +203,14 @@ export interface InstallAnswers {
   model: string;
   apiKey: string;
   fallbacks: FallbackConfig[];
-  /** Chosen scope for the native claude/codex artifacts. Plugin agents are
-   *  always global; runInstall derives the effective config scope from
-   *  `targets` (any plugin agent ⇒ global config). */
+  /** Chosen scope for the native claude/codex/opencode artifacts. Plugin
+   *  agents are always global; runInstall derives the effective config scope
+   *  from `targets` (any plugin agent ⇒ global config). */
   global: boolean;
+  /** Advisory lines produced during answer collection (e.g. the "Decide
+   *  later" warning); printed verbatim by runInstall before the install
+   *  steps. */
+  notes: string[];
 }
 
 export interface InstallOptions {
@@ -224,67 +277,72 @@ function isInteractive(): boolean {
 // ---------------------------------------------------------------- wizard
 
 async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.ProcessEnv): Promise<InstallAnswers> {
-  const presetSeed = seed.preset ? presetById(seed.preset) : undefined;
   const home = seed.home ?? homedir();
+  const notes: string[] = [];
 
-  // Step 1: ONE multi-select of all 12 agents (replaces the old
+  // Step 1: ONE multi-select of all 16 agents (replaces the old
   // claude/codex/both/plugin single-choice menu AND the plugin-client step).
   const targets = (await askMultiMenu(agentMenuSpec(home, env))) as Agent[];
 
-  const presetId = await askMenu({
-    prompt: "Vision endpoint preset",
-    options: PRESETS.map((p) => ({ value: p.id, label: p.label })),
-    default: presetSeed?.id ?? env.DVLS_PRESET ?? "openrouter",
-  });
+  const presetId = await askMenu(presetMenuSpec(seed, env));
   const preset = presetById(presetId);
 
-  const baseUrl = await askInput({
-    prompt: "Base URL (OpenAI-compatible, ends with /v1)",
-    hint: "e.g. " + (preset?.baseUrl || "http://localhost:11434/v1"),
-    default: seed.baseUrl ?? env.VISION_BASE_URL ?? preset?.baseUrl ?? DEFAULT_BASE_URL,
-  });
+  // Step 2b: "Decide later" (R4) — skip the four endpoint questions and warn
+  // that vision stays off until a model is configured. Explicit --flags / env
+  // values still win; with nothing set the config ends up without a model.
+  let baseUrl: string;
+  let apiKey: string;
+  let model: string;
+  let fallbacks: FallbackConfig[];
+  if (presetId === "later") {
+    baseUrl = seed.baseUrl ?? env.VISION_BASE_URL ?? DEFAULT_BASE_URL;
+    apiKey = seed.apiKey ?? env.VISION_API_KEY ?? "";
+    model = seed.model ?? env.VISION_MODEL ?? "";
+    fallbacks = seed.fallbacks ?? parseFallbacks(env.VISION_FALLBACKS);
+    if (!model) notes.push(DECIDE_LATER_WARNING);
+  } else {
+    baseUrl = await askInput({
+      prompt: "Base URL (OpenAI-compatible, ends with /v1)",
+      hint: "e.g. " + (preset?.baseUrl || "http://localhost:11434/v1"),
+      default: seed.baseUrl ?? env.VISION_BASE_URL ?? preset?.baseUrl ?? DEFAULT_BASE_URL,
+    });
 
-  const apiKey = await askSecret({
-    prompt: "API key (Enter to skip; stored in .deepseek-vl/config.json)",
-    default: seed.apiKey ?? env.VISION_API_KEY ?? "",
-  });
+    apiKey = await askSecret({
+      prompt: "API key (Enter to skip; stored in .deepseek-vl/config.json)",
+      default: seed.apiKey ?? env.VISION_API_KEY ?? "",
+    });
 
-  const model = await askInput({
-    prompt: "Vision model id",
-    hint: "e.g. " + (preset?.model || "qwen2.5vl:7b"),
-    default: seed.model ?? env.VISION_MODEL ?? preset?.model ?? "",
-  });
+    model = await askInput({
+      prompt: "Vision model id",
+      hint: "e.g. " + (preset?.model || "qwen2.5vl:7b"),
+      default: seed.model ?? env.VISION_MODEL ?? preset?.model ?? "",
+    });
 
-  const fallbackRaw = await askInput({
-    prompt: "Fallback models (Enter to skip; format: model@baseUrl, model2)",
-    hint: "or JSON [{\"model\":\"...\",\"baseUrl\":\"...\"}]",
-    default: "",
-  });
+    const fallbackRaw = await askInput({
+      prompt: "Fallback models (Enter to skip; format: model@baseUrl, model2)",
+      hint: "or JSON [{\"model\":\"...\",\"baseUrl\":\"...\"}]",
+      default: "",
+    });
+    fallbacks = parseFallbacks(fallbackRaw);
+  }
 
-  // The scope question is asked only when a native install (claude/codex)
-  // is selected; plugin agents are always global. When only plugin agents
-  // are selected the step is skipped entirely (endpoint config is written to
-  // the global ~/.deepseek-vl/config.json — project configs are not visible
-  // to the clients' MCP subprocesses).
-  const needsScope = targets.includes("claude") || targets.includes("codex");
+  // The scope question is asked only when a native install
+  // (claude/codex/opencode) is selected; plugin agents are always global and
+  // skill agents (trae/pi/dsh) are project-level only. When none is native
+  // the step is skipped entirely (endpoint config is written to the global
+  // ~/.deepseek-vl/config.json for plugin runs, project-local otherwise).
   const global =
-    needsScope &&
-    (await askMenu({
-      prompt: "Install scope",
-      options: [
-        { value: "project", label: "Project (.claude/ .codex/ in this directory)" },
-        { value: "global", label: "Global (~/.claude ~/.codex)" },
-      ],
-      default: seed.global ? "global" : "project",
-    })) === "global";
+    needsScopeQuestion(targets) &&
+    (await askMenu(scopeMenuSpec(seed))) === "global";
 
   return {
     targets,
     baseUrl: baseUrl || DEFAULT_BASE_URL,
     model: model || "",
     apiKey,
-    fallbacks: parseFallbacks(fallbackRaw),
+    fallbacks,
     global,
+    notes,
   };
 }
 
@@ -296,7 +354,11 @@ function collectNonInteractiveAnswers(opts: InstallOptions, env: NodeJS.ProcessE
   const model = opts.model ?? env.VISION_MODEL ?? preset?.model ?? "";
   const apiKey = opts.apiKey ?? env.VISION_API_KEY ?? "";
   const fallbacks = opts.fallbacks ?? parseFallbacks(env.VISION_FALLBACKS);
-  return { targets, baseUrl, model, apiKey, fallbacks, global };
+  const notes: string[] = [];
+  // --preset later (R4): same meaning as the interactive "Decide later" —
+  // no preset values, model stays empty unless explicitly given.
+  if (opts.preset === "later" && !model) notes.push(DECIDE_LATER_WARNING);
+  return { targets, baseUrl, model, apiKey, fallbacks, global, notes };
 }
 
 // ---------------------------------------------------------------- file helpers
@@ -533,29 +595,13 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
 
   // 5) .agents/skills (project scope only): many tools follow the Codex
   //    skill contract and read skills from <project>/.agents/skills/
-  //    (<name>/SKILL.md) — Cursor, GitHub Copilot, Kimi Code, etc. Global
-  //    installs skip it (it is a project-level convention) and mention the
-  //    skip. The content is the packaged skill (assets/SKILL.md, committed
-  //    as skills/deepseek-vision/SKILL.md), which carries SKILL_MARKER so
-  //    uninstall can tell our file from a user-authored one.
-  if (answers.global) {
-    log(`skipped .agents/skills/deepseek-vision/ write — project-level convention (global scope)`);
-  } else {
-    const agentsSkillsMd = join(opts.cwd, ".agents", "skills", SKILL_DIRNAME, "SKILL.md");
-    const packaged = readTextFile(packagedSkillPath());
-    if (packaged === null) {
-      report.warnings.push(`missing ${packagedSkillPath()} — run \`npm run build\` first (skipping .agents/skills write)`);
-    } else {
-      writeManagedFile(agentsSkillsMd, packaged, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER }, log, report.warnings);
-      // progressive disclosure: the SKILL.md body references
-      // references/vision-prompt.md, so the .agents skill dir must be
-      // self-contained (same semantics as the Claude branch)
-      const ref = readTextFile(templatePath("skill-references/vision-prompt.md"));
-      if (ref !== null) {
-        writeManagedFile(join(opts.cwd, ".agents", "skills", SKILL_DIRNAME, "references", "vision-prompt.md"), ref, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER }, log, report.warnings);
-      }
-    }
-  }
+  //    (<name>/SKILL.md) — Cursor, GitHub Copilot, Kimi Code, and the
+  //    skill-copy agents (opencode/trae/pi/dsh). Global installs skip it (it
+  //    is a project-level convention) and mention the skip. Shared helper in
+  //    skillagents.ts; the content is the packaged skill (assets/SKILL.md,
+  //    committed as skills/deepseek-vision/SKILL.md), which carries
+  //    SKILL_MARKER so uninstall can tell our file from a user-authored one.
+  writeSharedAgentsSkill(opts.cwd, { global: answers.global, update: opts.update, dryRun: opts.dryRun }, report, log);
 
   // models.json bug fix (#36382)
   const modelsPath = findModelsJson(opts.cwd, home);
@@ -603,17 +649,38 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   const answers = interactive ? await collectInteractiveAnswers(opts, env) : collectNonInteractiveAnswers(opts, env);
 
   const home = opts.home ?? homedir();
+  const pluginDetection = detectPluginClients(home, env);
+  const skillDetection = detectSkillModuleAgents(home, env);
   const hasPlugin = answers.targets.some(isPluginAgent);
   // Plugin agents are always global: their MCP subprocesses resolve config as
   // env > global > defaults and cannot see project configs. Mixed runs
   // (e.g. claude + copilot) therefore write the endpoint config globally; a
   // project-scope claude install still resolves it via the project → global
-  // fallback in resolveConfig().
+  // fallback in resolveConfig(). Skill agents (trae/pi/dsh) never globalize.
   const configGlobal = hasPlugin || answers.global;
   const configDir = configGlobal ? globalConfigDir(home) : join(opts.cwd, CONFIG_DIR);
   const configFile = join(configDir, "config.json");
 
   log(`deepseek-vl-support installer (targets: ${answers.targets.join(",")}, scope: ${configGlobal ? "global" : "project"})`);
+
+  // R5: warn about selected-but-undetected agents that HAVE a detector —
+  // claude/codex (no detector) and `other` (no detection surface) are never
+  // annotated, exactly like before the wizard labels were cleaned up.
+  // Non-blocking: the per-agent drivers still print their manual guidance
+  // below, and other agents install normally.
+  const detectedById = new Map<Agent, boolean>();
+  for (const c of PLUGIN_CLIENTS) {
+    if (clientHasDetector(c)) detectedById.set(c, pluginDetection[c].detected);
+  }
+  for (const a of SKILL_MODULE_AGENTS) detectedById.set(a, skillDetection[a].detected);
+  for (const a of answers.targets) {
+    if (detectedById.get(a) === false) {
+      const hint = (NOT_DETECTED_HINTS as Record<string, string | undefined>)[a];
+      log(`⚠ ${AGENT_LABELS[a]} was not detected on this machine — install it first${hint ? ` (${hint})` : ""}.`);
+    }
+  }
+  // advisory notes collected during answer collection ("Decide later")
+  for (const n of answers.notes) log(n);
 
   // 1) config.json (deep-merge write)
   if (opts.dryRun) {
@@ -656,6 +723,26 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
         });
       }
     }
+  }
+  const skillTargets = answers.targets.filter(
+    (a): a is SkillModuleAgent => a === "opencode" || AGENT_KINDS[a] === "skill",
+  );
+  if (skillTargets.length > 0) {
+    agents.push(
+      ...(await installSkillAgents(
+        {
+          cwd: opts.cwd,
+          home,
+          global: answers.global,
+          update: opts.update,
+          dryRun: opts.dryRun,
+          agents: skillTargets,
+          log,
+          warnings: report.warnings,
+        },
+        skillDetection,
+      )),
+    );
   }
   if (hasPlugin) {
     agents.push(...(await installPluginAgents(opts, answers, report)));
@@ -936,6 +1023,17 @@ export async function runUninstall(opts: UninstallOptions): Promise<UninstallRep
         agents.push({ agent, status: "failed", detail: `unexpected error: ${e instanceof Error ? e.message : String(e)}` });
       }
     }
+  }
+  const skillTargets = targets.filter(
+    (a): a is SkillModuleAgent => a === "opencode" || AGENT_KINDS[a] === "skill",
+  );
+  if (skillTargets.length > 0) {
+    agents.push(
+      ...(await uninstallSkillAgents(
+        { cwd: opts.cwd, home, global: opts.global, dryRun: opts.dryRun, agents: skillTargets },
+        detectSkillModuleAgents(home),
+      )),
+    );
   }
   if (hasPlugin) {
     agents.push(...(await uninstallPluginAgents(opts, report)));

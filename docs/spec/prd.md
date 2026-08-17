@@ -116,16 +116,18 @@ Windows Server 2022；node v24.14.1、npm 11.11.0、python 3.12.9、git 2.53.0 �
   - 局限写入文档：Codex 无自动拦截，粘贴图片会丢失，需保存文件后由 Agent 调用工具。
 - **R4 一键安装**（D1/D3）：
   - `npx deepseek-vl-support@latest install`：**简单编号菜单式向导**（每步列出选项按数字选择、
-    带默认值回车即可跳过：第一步为**单个多选列表**（claude / codex / copilot / cursor /
-    kiro / openclaw / hermes / vscode / chatgpt-codex / grok / nanoclaw / other 共 12 项，
-    插件客户端标注检测状态，codex 标注 `.agents/skills/` 写入，`other` 为通用
-    「Other agents that support the Agent Plugins open standard」选项；取代旧的
-    claude/codex/both 单选与单独插件客户端步骤）→ 端点预设（13 项：OpenRouter / Moonshot /
-    MiniMax / Zhipu GLM / StepFun / OpenCode Zen / 硅基流动 / 百炼 / 自定义 / Ollama /
-    llama.cpp / vLLM / LM Studio）→ baseUrl（预设默认）→ API key（可跳过）→ 模型 id
-    （预设示例）→ 备用模型（可跳过）→ 作用域（仅当选择了 claude/codex 时询问；只选插件
-    agent 时跳过，插件 agent 恒为全局）→ 写配置 → 安装文件 → 深合并配置 → 自动 doctor →
-    下一步提示。
+    带默认值回车即可跳过：第一步为**单个多选列表**（claude / codex / opencode / trae / pi /
+    dsh / copilot / cursor / kiro / openclaw / hermes / vscode / chatgpt-codex / grok /
+    nanoclaw / other 共 16 项，标签为纯名称（无检测/机制标注），选中未检测到的 agent 时
+    安装阶段输出"not detected — install it first"提示；`other` 为通用「Other agents that
+    support the Agent Plugins open standard」选项；取代旧的 claude/codex/both 单选与单独
+    插件客户端步骤）→ 端点预设（13 项：OpenRouter / Moonshot / MiniMax / Zhipu GLM /
+    StepFun / OpenCode Zen / 硅基流动 / 百炼 / 自定义 / Ollama / llama.cpp / vLLM /
+    LM Studio，外加 "Decide later"：选中则跳过 baseUrl/key/模型/备用模型四步并警告
+    不配置模型将无法使用视觉功能，附 `config set` 补配指引）→ baseUrl（预设默认）→
+    API key（可跳过）→ 模型 id（预设示例）→ 备用模型（可跳过）→ 作用域（项目标注推荐、
+    置首、默认；仅当选中 native agent（claude/codex/opencode）时询问——skill/plugin
+    agent 不触发）→ 写配置 → 安装文件 → 深合并配置 → 自动 doctor → 下一步提示。
   - 幂等（重复执行不重复追加）；`--update` 覆盖升级；**`uninstall` 一键卸载**：按标记移除
     全部注入产物（hooks 条目、hook 脚本、skill、command、MCP 段、AGENTS.md 段、.gitignore 行），
     用户原配置无损，config.json 与缓存默认保留（`--purge-config` 才删除）；

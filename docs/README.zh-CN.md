@@ -24,7 +24,11 @@ MIT 开源协议。
 
 ## 适合谁用
 
-- 你在用 **Claude Code** 或 **Codex**，接的是 DeepSeek（或其他纯文字）模型。
+- 你在用 DeepSeek（或其他纯文字）模型，并且用的是下面任一受支持的 agent：
+  原生——Claude Code、Codex、OpenCode；技能型——Trae、Pi Coding Agent、
+  DeepSeek Harness；Agent Plugins 客户端——GitHub Copilot、Cursor、Kiro、
+  OpenClaw、Hermes Agent、VS Code、ChatGPT & Codex、Grok Bot、NanoClaw，
+  以及其他符合标准的 agent。
 - 你想让模型看懂图片：报错截图、界面草图、图表、手写笔记照片。
 
 ## 开始之前（需要准备什么）
@@ -37,7 +41,8 @@ MIT 开源协议。
    方案：**Ollama**、**llama.cpp**、**vLLM**、**LM Studio**（这些跑在你自己的电脑上）。
    **API key** 是这家服务发给你的密钥（一般在它网站的"API 密钥"页面里）。安装时问一次，
    只存在你自己的电脑上。
-3. 已安装 Claude Code 或 Codex。
+3. 已安装上面任一受支持的 agent——插件客户端、技能型 agent，或
+   Claude Code / Codex / OpenCode。
 
 ## 安装（大约 2 分钟）
 
@@ -48,17 +53,43 @@ cd path/to/your/project
 npx deepseek-vl-support@latest install
 ```
 
+**没有 CLI？让 agent 直接从 GitHub 装。** 10 个 Agent Plugins 客户端
+（GitHub Copilot、Cursor、Kiro、OpenClaw、Hermes Agent、VS Code、
+ChatGPT & Codex、Grok Bot、NanoClaw，以及其他符合标准的 agent）可以自己
+安装插件——不需要终端。直接在对话里说（提示词保持英文原样，便于复制）：
+
+> Install the plugin from https://github.com/limccn/deepseek-vl-support and enable it
+
+仓库根目录本身就是 Agent Plugins v1.0.0 插件（`plugin.json` + `mcp.json` +
+`skills/`），支持开放标准的 agent 可以直接从 GitHub 仓库地址安装。两点如实
+说明：(a) 只适用于上面的 Agent Plugins 客户端——Claude Code、Codex、OpenCode、
+Trae、Pi、DeepSeek Harness 不支持该标准，必须走上面的 npx 向导；(b) 从 GitHub
+安装只装插件本体，不会生成 `~/.deepseek-vl/config.json`——之后用
+`npx deepseek-vl-support@latest install --target <客户端>` 补配视觉端点，或
+用环境变量（见[环境变量配置](#环境变量配置)）。各客户端的安装命令见
+[Agent Plugins 模式](#agent-plugins-模式10-个兼容客户端)章节。
+
 会出现一个带编号的菜单，共 7 个问题。**大部分都有合适的默认值——直接按回车即可。**
 
 | # | 问题 | 什么意思 | 默认值 |
 |---|---|---|---|
-| 1 | 哪些 agent 要装视觉？ | 多选（逗号分隔的数字）：`claude`、`codex`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、`other`——本机未检测到的插件客户端会标注"not detected"（提供手动指引） | claude, codex + 检测到的插件客户端 |
-| 2 | 视觉端点预设 | 用哪家"看图服务"——选你注册了账号的那家（见下方端点表） | openrouter |
+| 1 | 哪些 agent 要装视觉？ | 多选（逗号分隔的数字）：`claude`、`codex`、`opencode`、`trae`、`pi`、`dsh`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、`other`。选中的 agent 在本机**未检测到**时，安装过程中会打印"install it first"提示——不阻塞，手动指引照常输出 | claude, codex + 本机检测到的 agent |
+| 2 | 视觉端点预设 | 用哪家"看图服务"——选你注册了账号的那家（见下方端点表），或选最后一项 **Decide later**（稍后决定）跳过端点配置 | openrouter |
 | 3 | 端点地址（Base URL） | 那家服务的地址（预设已帮你填好） | 来自预设 |
 | 4 | API key | 那家服务的密钥；只存在你自己的电脑上 | 回车跳过 |
 | 5 | 视觉模型 id | 用哪双"眼睛"（预设已帮你填好） | 来自预设 |
 | 6 | 兜底模型 | 主服务失灵时的备用"眼睛"（可不填） | 回车跳过 |
-| 7 | 安装范围 | 只装这个项目，还是所有项目 | project |
+| 7 | 安装范围 | 只装这个项目（推荐），还是所有项目。只有选中了原生 agent（`claude`、`codex`、`opencode`）时才会问 | project |
+
+**Decide later（稍后决定）**：选择它（或非交互安装时用 `--preset later`）会跳过
+端点地址 / API key / 模型 / 兜底模型这些问题——其余照常安装，但安装器会打印：
+
+> Vision not configured: images cannot be described until a model is set.
+> （视觉未配置：在设置模型之前无法描述图片。）
+
+之后随时补上：`npx deepseek-vl-support@latest config set model <id>`
+（不用默认端点的话再加 `config set baseUrl <url>`），或设置
+`VISION_MODEL` / `VISION_BASE_URL` 环境变量。
 
 装完之后：
 
@@ -147,11 +178,48 @@ npx deepseek-vl-support@latest config set maxBytes 5242880
 
 同一张图片描述两次是免费的：结果缓存在你的电脑上（上限 64 MB）。图片变了才会重新描述。
 
+## 环境变量配置
+
+所有设置都可以不写配置文件、直接用环境变量。它对所有消费者一视同仁——Claude
+Code 钩子、插件客户端启动的 MCP 服务器、`describe` CLI 读的都是同一份合并后
+的配置——改完环境变量也**不需要重跑安装**。
+
+| 变量 | 作用 | 示例值 |
+|---|---|---|
+| `VISION_BASE_URL` | 看图服务地址 | `https://api.moonshot.cn/v1` |
+| `VISION_MODEL` | 视觉模型 id | `moonshot-v1-32k-vision-preview` |
+| `VISION_API_KEY` | 你的 API key | `sk-...` |
+| `VISION_TIMEOUT_MS` | 等一次描述多久（毫秒） | `120000` |
+| `VISION_MAX_BYTES` | 超过这个大小的图片会被跳过 | `10485760` |
+| `VISION_FALLBACKS` | 兜底模型（`model@baseUrl`，逗号分隔） | `qwen/qwen2.5-vl-72b-instruct@https://api.siliconflow.cn/v1` |
+| `VISION_DISABLE` | 整体关闭视觉（`1` / `true`） | `1` |
+
+优先级：环境变量逐字段覆盖配置文件——`VISION_*` > 项目 `.deepseek-vl/config.json`
+> 全局 `~/.deepseek-vl/config.json` > 内置默认值。这也是通过 GitHub 提示词安装
+插件（不生成配置文件）之后最简单的补配方式。
+
+Bash：
+
+```bash
+export VISION_BASE_URL="https://api.moonshot.cn/v1"
+export VISION_MODEL="moonshot-v1-32k-vision-preview"
+export VISION_API_KEY="sk-..."
+```
+
+PowerShell：
+
+```powershell
+$env:VISION_BASE_URL = "https://api.moonshot.cn/v1"
+$env:VISION_MODEL = "moonshot-v1-32k-vision-preview"
+$env:VISION_API_KEY = "sk-..."
+```
+
 ## 故障排查
 
 | 现象 | 怎么办 |
 |---|---|
 | 模型还是不描述图片 | 1) 重启会话（安装后必须重启）。2) 运行 `… doctor`，看有没有 `[OK]`。 |
+| `doctor` 显示 "VISION_MODEL not set" / 未配置模型 | 安装时选了 **Decide later**。现在补上：`config set model <id>`（不用默认端点的话再加 `config set baseUrl <url>`），或设置 `VISION_MODEL` / `VISION_BASE_URL` 环境变量（见[环境变量配置](#环境变量配置)）。 |
 | `doctor` 显示 "unreachable" 或没有 `[OK]` | 服务地址或密钥不对：确认 base URL 以 `/v1` 结尾、API key 正确。（如果服务不公开模型列表，`doctor` 会改为显示警告——只要说 reachable 就没问题。） |
 | 提示 "image too large" | 图片超限了——先压缩或裁剪（比如 5 MB 以内、长边约 2000 像素），或者用 `config set maxBytes …` 调大限制。 |
 | 描述很慢 | 调低限制（`config set maxBytes 5242880`），或换一个更快的端点。 |
@@ -183,9 +251,8 @@ npx deepseek-vl-support@latest config set maxBytes 5242880
 
 - **兜底模型**：主服务失败（网络错误 / 超时 / 空回答）时按顺序换下一个，共享一个时间预算。
   `doctor --all` 逐个检查。
-- **环境变量**逐字段覆盖配置文件：`VISION_BASE_URL`、`VISION_MODEL`、`VISION_API_KEY`、
-  `VISION_FALLBACKS`、`DVLS_TARGET`、`DVLS_SCOPE`；`VISION_DISABLE=1` 或配置 `enabled:false`
-  可整体关闭视觉（hook / MCP 全部 no-op）。
+- **环境变量**逐字段覆盖配置文件：见[环境变量配置](#环境变量配置)章节；
+  安装参数 `DVLS_TARGET` / `DVLS_SCOPE` 同理。
 - **查看 / 修改配置**：`config get [key]` / `config set <key> <value>` / `config path`。
 - **自定义提示词（Claude Code 技能）**：项目 `.deepseek-vl/vision-prompt.md` > 全局 > 内置默认。
 - **Codex 项目级安装需先信任项目**：codex 只在已信任目录加载项目级 MCP 配置；项目级安装后
@@ -197,12 +264,38 @@ npx deepseek-vl-support@latest install --non-interactive \
   --target claude,codex --preset custom \
   --base-url https://api.moonshot.cn/v1 --model moonshot-v1-32k-vision-preview \
   --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
+
+# 完全跳过端点配置（等同向导里的 Decide later）
+npx deepseek-vl-support@latest install --non-interactive --target opencode --preset later
 ```
 
-`--target` 接受逗号分隔的 agent 列表（`claude`、`codex`、`copilot`、`cursor`、
-`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、
-`other`），默认 `claude,codex`。任意组合都支持——例如
-`--target claude,copilot` 一次运行同时装好 Claude Code 钩子并注册 Copilot 插件。
+`--target` 接受逗号分隔的 agent 列表（`claude`、`codex`、`opencode`、`trae`、
+`pi`、`dsh`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、
+`chatgpt-codex`、`grok`、`nanoclaw`、`other`），默认 `claude,codex` + 本机检测到的
+agent。任意组合都支持——例如 `--target claude,copilot` 一次运行同时装好 Claude
+Code 钩子并注册 Copilot 插件。要跳过端点配置，传 `--preset later`。
+
+## 技能型 agent（OpenCode / Trae / Pi / DeepSeek Harness）
+
+这四个 agent 读取 [Agent Skills](https://agent-skills.org) 技能，但没有实现
+Agent Plugins 开放标准，因此有各自的集成方式（`--target opencode,trae,pi,dsh`）。
+OpenCode 是原生 agent，它的产物（`opencode.json` + 共享技能）随你选择的安装范围
+（项目/全局）而定。技能复制型 agent（trae/pi/dsh）**只支持项目级安装**，永远
+不会触发安装范围问题：
+
+| Agent | 安装器做什么 | 验证 / 说明 |
+|---|---|---|
+| OpenCode（`opencode`） | 在 `opencode.json` 写入 MCP 条目（`mcp.deepseek-vl`，`type: local`，`npx -y deepseek-vl-support mcp`，`enabled: true`）+ 共享 `.agents/skills/` 技能。按安装范围写项目级或全局级文件；文件做深合并（你的其他键和 MCP 服务器绝不改动），首次修改前备份为 `opencode.json.bak` | OpenCode 原生读取 `.agents/skills/`；重启 OpenCode 后让它描述一张截图 |
+| Trae（`trae`） | 技能复制到 `.trae/skills/deepseek-vision/` + 手动导入指引（Settings → Rules & Skills → Create/Import）+ 可选的手动 MCP 配置（Settings → MCP） | Trae 是 IDE——没有 CLI 自动化；MCP 条目需要手动（Trae 的配置路径未验证） |
+| Pi Coding Agent（`pi`） | 共享 `.agents/skills/` 技能；**仅当检测到 pi-mcp-adapter 扩展**（存在 `~/.pi/agent/mcp.json` 或 `~/.pi/agent/npm/`）时才写 `mcpServers.deepseek-vl` 到 `~/.pi/agent/mcp.json`，否则打印安装该扩展的指引 | pi 核心没有 MCP——先装适配器（`pi install npm:pi-mcp-adapter`），重启 pi，再重跑安装器 |
+| DeepSeek Harness（`dsh`） | 共享 `.agents/skills/` 技能（dsh 以 200 优先级读取 `<project>/.agents/skills`）+ MCP 指引（开发预览版 `@deepseek-ai/dsh-mcp-client` 插件，写 `cordis.patch.yml`） | MCP 是手动的——dsh 没有内置 MCP 支持 |
+
+选中的 agent 在本机未检测到时，安装时非阻塞地提示：
+`⚠ <Label> was not detected on this machine — install it first (<hint>).`
+
+卸载归属：`uninstall --target opencode|pi|dsh` 只移除各自专属的文件（opencode.json /
+mcp.json 中的条目），**保留**共享的 `.agents/skills/deepseek-vision/` 目录——其他
+agent 可能还在用。只有 `uninstall --target codex` 会删除共享技能目录（或手动删目录）。
 
 ## Agent Plugins 模式（10 个兼容客户端）
 

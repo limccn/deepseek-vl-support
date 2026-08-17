@@ -202,29 +202,35 @@ tool_timeout_sec = 180
 ## 8. 安装器（install.ts）
 
 流程：`install [--global] [--target <agent,...>] [--non-interactive …]`，
-`--target` 为逗号分隔的 agent 列表（claude / codex / copilot / cursor / kiro / openclaw /
-hermes / vscode / chatgpt-codex / grok / nanoclaw / other 共 12 项；默认 claude,codex；
-不再支持 both/plugin 取值）：
+`--target` 为逗号分隔的 agent 列表（claude / codex / opencode / trae / pi / dsh /
+copilot / cursor / kiro / openclaw / hermes / vscode / chatgpt-codex / grok / nanoclaw /
+other 共 16 项；默认 claude,codex；不再支持 both/plugin 取值）：
 1. **简单编号菜单式向导**（bilingual；基于 `node:readline/promises`，零依赖；非交互模式走
    flags/env）：每步打印编号选项 + 默认值，输入数字选择、回车取默认、可跳过：
-   ① 目标——**单个多选列表**（共 12 项，插件客户端标注"not detected — manual
-   instructions"；默认 claude,codex + 检测到的插件客户端；codex 菜单标签注明
-   `.agents/skills/` 写入；`other` = "Other agents that support the Agent Plugins open
-   standard" 通用选项）→ ② 端点预设（顺序 D2，13 项：1 OpenRouter / 2 Moonshot /
-   3 MiniMax / 4 Zhipu GLM / 5 StepFun / 6 OpenCode Zen / 7 硅基流动 / 8 百炼 /
-   9 自定义 / 10 Ollama / 11 llama.cpp / 12 vLLM / 13 LM Studio）→ ③ baseUrl（回车=
-   预设默认）→ ④ API key（隐藏输入，回车跳过）→ ⑤ model id（回车=预设示例）→
-   ⑥ 备用模型（回车跳过，格式 `model@baseUrl`，可多个；**备用端点需要独立 API key 时**，
-   向导提示安装后用 `config set fallbacks <json>` 或直接编辑 config.json）→ ⑦ 作用域确认
-   （项目/全局；**仅当选中 claude/codex 时询问**——只选插件 agent 时跳过，插件 agent 恒为全局）。
+   ① 目标——**单个多选列表**（共 16 项，标签为纯名称（无检测/机制标注、无 `(default)`
+   标记）；默认 claude,codex + 检测到的 agent；选中未检测到的 agent 时安装阶段输出
+   "not detected — install it first" 提示，手动指引照常输出，不阻断其余）
+   → ② 端点预设（顺序 D2，13 项 + "Decide later"：选后者跳过 baseUrl/key/模型/备用模型
+   四步并输出警告——不配置模型将无法使用视觉功能，附 `config set` 补配指引；
+   非交互等价 `--preset later`）→ ③ baseUrl（回车=预设默认）→ ④ API key（隐藏输入，
+   回车跳过）→ ⑤ model id（回车=预设示例）→ ⑥ 备用模型（回车跳过，格式 `model@baseUrl`，
+   可多个；**备用端点需要独立 API key 时**，向导提示安装后用 `config set fallbacks <json>`
+   或直接编辑 config.json）→ ⑦ 作用域确认（项目/全局；项目标注推荐、置首、默认；
+   **仅当选中 native agent（claude/codex/opencode）时询问**——skill/plugin agent 不触发）。
 2. 写 config.json（**选中任一插件 agent 时写全局** `~/.deepseek-vl/`——插件 MCP 子进程
-   只解析 env > 全局；否则项目 `.deepseek-vl/`；目录自动创建）→
+   只解析 env > 全局；否则按作用域项目 `.deepseek-vl/`；目录自动创建）→
    `.gitignore` 追加 `.deepseek-vl/`（仅项目作用域）。
 3. 按 agent 逐项安装（任一失败不阻塞其余，结果聚合进统一 per-agent 报告）：
    claude → hook.cjs + skill + command + settings.json 深合并（备份 + 标记识别）；
-   codex → config.toml 段 + AGENTS.md 段 + models.json 修复 + **项目级时写入
-   `.agents/skills/deepseek-vision/SKILL.md`**（全局级跳过并在报告注明；供 Cursor、
-   GitHub Copilot、Kimi Code 等读取）；
+   codex → config.toml 段 + AGENTS.md 段 + models.json 修复 + **项目级时写共享
+   `.agents/skills/deepseek-vision/`**（全局级跳过并在报告注明）；
+   opencode（native）→ `opencode.json` `mcp["deepseek-vl"]` type:"local" 深合并
+   （项目/全局随作用域；备份 + 幂等）+ 共享技能；
+   skill 型 agent——trae → 复制技能到 `.trae/skills/deepseek-vision/`（标记管理）+
+   手动导入指引（MCP 不自动化）；pi → 共享技能 + 检测到 pi-mcp-adapter 时才写
+   `~/.pi/agent/mcp.json`（否则仅指引）；dsh → 共享技能 + 仅指引（dev preview 不自动写配置）；
+   **共享技能卸载归属**：`.agents/skills/deepseek-vision/` 由 codex 独占删除（标记校验），
+   opencode/pi/dsh 卸载保留并输出说明；
    插件 agent（copilot/cursor/kiro/openclaw/hermes/vscode/chatgpt-codex/grok/nanoclaw/other）
    → 物化 `~/.deepseek-vl/plugin/` 一次（恒 4 项）+ 逐客户端注册（生效集合 =
    `--target ∩ --clients`，`--clients` 为向后兼容过滤器；无 CLI → manual 指引；

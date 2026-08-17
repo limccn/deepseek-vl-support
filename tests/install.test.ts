@@ -10,8 +10,20 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { agentMenuSpec, parseTargets, runInstall, runUninstall } from "../src/install.ts";
-import { AGENTS, detectPluginClients, PLUGIN_CLIENT_LABELS, PLUGIN_CLIENTS } from "../src/plugin.ts";
+import type { InstallOptions } from "../src/install.ts";
+import {
+  agentMenuSpec,
+  DECIDE_LATER_WARNING,
+  needsScopeQuestion,
+  parseTargets,
+  presetMenuSpec,
+  PRESETS,
+  runInstall,
+  runUninstall,
+  scopeMenuSpec,
+} from "../src/install.ts";
+import { AGENT_LABELS, AGENTS, detectPluginClients, PLUGIN_CLIENTS } from "../src/plugin.ts";
+import { detectSkillModuleAgents, opencodeConfigFile, SKILL_MODULE_AGENTS, traeConfigDir } from "../src/skillagents.ts";
 import {
   AGENTS_END_MARKER,
   AGENTS_START_MARKER,
@@ -539,39 +551,209 @@ test("parseTargets: comma list, dedupe, case-insensitive, default; rejects both/
   assert.deepEqual(parseTargets("ChatGpt-Codex,NanoClaw"), ["chatgpt-codex", "nanoclaw"]);
   assert.throws(() => parseTargets("both"), /invalid target: "both"/);
   assert.throws(() => parseTargets("plugin"), /invalid target: "plugin"/);
-  assert.throws(() => parseTargets("bogus"), /expected one of: claude,codex,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/);
+  assert.deepEqual(parseTargets("opencode,trae,pi,dsh"), ["opencode", "trae", "pi", "dsh"]);
+  assert.deepEqual(parseTargets("Trae,PI,Dsh"), ["trae", "pi", "dsh"]);
+  assert.throws(
+    () => parseTargets("bogus"),
+    /expected one of: claude,codex,opencode,trae,pi,dsh,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/,
+  );
   assert.throws(() => parseTargets("claude,bogus"), /invalid target: "bogus"/);
   assert.throws(() => parseTargets(","), /invalid target: ""/);
 });
 
-test("agentMenuSpec: one flat 12-option multi-select, no both/plugin, detection annotations", () => {
-  const fakeHome = join(process.cwd(), "does-not-exist-home");
-  const spec = agentMenuSpec(fakeHome);
-  assert.deepEqual(spec.options.map((o) => o.value), AGENTS);
-  assert.equal(spec.options.length, 12);
-  assert.ok(spec.options.every((o) => o.value !== "both" && o.value !== "plugin"), "menu must not offer both/plugin");
-  // defaults: claude + codex (former "both") plus the plugin clients
-  // detected on THIS machine (mirrors the spec's default computation)
-  const detected = detectPluginClients(fakeHome);
-  assert.deepEqual(spec.default, ["claude", "codex", ...PLUGIN_CLIENTS.filter((c) => detected[c].detected)]);
-  // native entries explain their mechanism; plugin entries annotate detection
-  assert.ok(spec.options.find((o) => o.value === "claude")!.label.includes("hook"));
-  assert.ok(spec.options.find((o) => o.value === "codex")!.label.includes(".agents/skills/"), "codex label mentions the .agents/skills/ write");
-  for (const o of spec.options) {
-    if (o.value !== "claude" && o.value !== "codex" && o.value !== "other") {
-      assert.ok(o.label.startsWith(PLUGIN_CLIENT_LABELS[o.value as keyof typeof PLUGIN_CLIENT_LABELS]));
-      if (detected[o.value as keyof typeof detected].detected) {
-        assert.ok(!o.label.includes("not detected"), `detected client should not be annotated: ${o.label}`);
-      } else {
-        assert.ok(o.label.includes("not detected"), `undetected client should carry the annotation: ${o.label}`);
-      }
+test("agentMenuSpec: one flat 16-option multi-select, pure-name labels, detected defaults", async () => {
+  const { base, project, home } = await makeEnv();
+  try {
+    // hermetic environment: no real CLIs from the host machine; a simulated
+    // Trae install (config dir) must land in the default selection
+    mkdirSync(traeConfigDir(home), { recursive: true });
+    const env = { PATH: "" };
+    const spec = agentMenuSpec(home, env);
+    assert.deepEqual(spec.options.map((o) => o.value), AGENTS);
+    assert.equal(spec.options.length, 16);
+    assert.ok(spec.options.every((o) => o.value !== "both" && o.value !== "plugin"), "menu must not offer both/plugin");
+    // R5: labels are the pure AGENT_LABELS names — no annotation parens
+    for (const o of spec.options) {
+      assert.equal(o.label, AGENT_LABELS[o.value as keyof typeof AGENT_LABELS]);
+      assert.ok(!o.label.includes("not detected"), `no detection annotation: ${o.label}`);
+      assert.ok(!o.label.includes("hooks intercept"), `no claude annotation: ${o.label}`);
+      assert.ok(!o.label.includes("also writes"), `no codex annotation: ${o.label}`);
+      assert.ok(!o.label.includes("(default)"), `no default marker: ${o.label}`);
     }
+    // defaults: claude + codex plus every agent detected (plugin clients +
+    // the skill-module agents), computed exactly like the spec does
+    const detected = detectPluginClients(home, env);
+    const skillDetected = detectSkillModuleAgents(home, env);
+    assert.deepEqual(spec.default, [
+      "claude",
+      "codex",
+      ...PLUGIN_CLIENTS.filter((c) => detected[c].detected),
+      ...SKILL_MODULE_AGENTS.filter((a) => skillDetected[a].detected),
+    ]);
+    assert.ok(spec.default.includes("trae"), "detected trae (config dir) is a default");
+    assert.ok(!spec.default.includes("opencode"), "undetected opencode is not a default");
+    assert.ok(!spec.default.includes("pi"), "undetected pi is not a default");
+    assert.ok(!spec.default.includes("dsh"), "undetected dsh is not a default");
+  } finally {
+    await rm(base, { recursive: true, force: true });
   }
+});
+
+test("needsScopeQuestion: only native agents (claude/codex/opencode) trigger the scope question", () => {
+  assert.equal(needsScopeQuestion(["claude"]), true);
+  assert.equal(needsScopeQuestion(["codex"]), true);
+  assert.equal(needsScopeQuestion(["opencode"]), true);
+  assert.equal(needsScopeQuestion(["claude", "copilot"]), true);
+  assert.equal(needsScopeQuestion(["pi", "trae", "dsh", "opencode"]), true);
+  assert.equal(needsScopeQuestion(["pi"]), false, "skill agents are project-level only");
+  assert.equal(needsScopeQuestion(["trae", "dsh"]), false);
+  assert.equal(needsScopeQuestion(["copilot", "kiro"]), false, "plugin agents are always global");
+  assert.equal(needsScopeQuestion([]), false);
+});
+
+test("presetMenuSpec: the 13 presets plus a 'Decide later' escape option (not a real preset)", () => {
+  const seed: InstallOptions = { cwd: "/" };
+  const spec = presetMenuSpec(seed, {});
+  assert.equal(spec.options.length, PRESETS.length + 1);
+  assert.deepEqual(spec.options[spec.options.length - 1], { value: "later", label: "Decide later" });
+  assert.equal(spec.default, "openrouter");
+  assert.equal(presetMenuSpec({ ...seed, preset: "later" }, {}).default, "later");
+  assert.equal(presetMenuSpec(seed, { DVLS_PRESET: "ollama" }).default, "ollama");
   assert.equal(
-    spec.options.find((o) => o.value === "other")!.label,
-    PLUGIN_CLIENT_LABELS["other"],
-    "other is never annotated with detection status",
+    presetMenuSpec({ ...seed, preset: "ollama" }, { DVLS_PRESET: "openrouter" }).default,
+    "ollama",
+    "explicit flag wins",
   );
+});
+
+test("scopeMenuSpec: Project first, marked recommended, and the default", () => {
+  const seed: InstallOptions = { cwd: "/" };
+  const spec = scopeMenuSpec(seed);
+  assert.deepEqual(spec.options.map((o) => o.value), ["project", "global"]);
+  assert.equal(spec.options[0].label, "Project (recommended, this directory)");
+  assert.equal(spec.options[1].label, "Global (all projects)");
+  assert.equal(spec.default, "project");
+  assert.equal(scopeMenuSpec({ ...seed, global: true }).default, "global");
+});
+
+test("--preset later: config without model/baseUrl, 'Decide later' warning printed", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const report = await runInstall({
+        cwd: project,
+        home,
+        nonInteractive: true,
+        targets: ["claude"],
+        preset: "later",
+      });
+      const cfg = json(join(project, ".deepseek-vl", "config.json"));
+      assert.equal(cfg.model, undefined, "no model key in config");
+      assert.equal(cfg.baseUrl, undefined, "default baseUrl omitted");
+      assert.equal(cfg.apiKey, undefined);
+      assert.equal(cfg.fallbacks, undefined);
+      assert.ok(
+        report.output.some((l) => l.includes("Vision not configured")),
+        `warning expected in output: ${report.output.join("|")}`,
+      );
+      assert.ok(
+        report.output.some((l) => l.includes(DECIDE_LATER_WARNING.split("\n")[1]!.trim())),
+        `re-config guidance expected: ${report.output.join("|")}`,
+      );
+      // install completes: artifacts still written (config without model)
+      assert.ok(existsSync(join(project, ".claude", "hooks", "deepseek-vision-hook.cjs")));
+      assert.ok(report.output.some((l) => l.includes("model not set")), "config log flags the missing model");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("selected-but-undetected agent: 'install it first' notice; agents without detectors are never warned", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const report = await runInstall({
+        cwd: project,
+        home,
+        nonInteractive: true,
+        targets: ["trae"],
+        baseUrl: mock.url,
+        model: "qwen2.5vl:7b",
+      });
+      assert.ok(
+        report.output.some((l) => l.includes("Trae was not detected on this machine") && l.includes("install it first")),
+        `expected the R5 notice, got: ${report.output.join("|")}`,
+      );
+      // trae's own manual guidance still printed (non-blocking)
+      assert.ok(report.output.some((l) => l.startsWith("[trae] manual")), `manual guidance kept: ${report.output.join("|")}`);
+      // claude/codex (no detector) and `other` (no detection surface) never get the notice
+      const report2 = await runInstall({
+        cwd: project,
+        home,
+        nonInteractive: true,
+        targets: ["claude", "other"],
+        baseUrl: mock.url,
+        model: "qwen2.5vl:7b",
+      });
+      assert.ok(!report2.output.some((l) => l.includes("not detected on this machine")));
+      // plugin clients with a detector get the same notice (R5 replaced their
+      // old "(not detected — manual instructions)" menu annotation); cursor's
+      // dir probe is hermetic on the temp home, so the notice must fire
+      const report3 = await runInstall({
+        cwd: project,
+        home,
+        nonInteractive: true,
+        targets: ["cursor"],
+        baseUrl: mock.url,
+        model: "qwen2.5vl:7b",
+      });
+      assert.ok(
+        report3.output.some(
+          (l) => l.includes("Cursor was not detected on this machine") && l.includes("install it first"),
+        ),
+        `plugin-client notice expected: ${report3.output.join("|")}`,
+      );
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
+test("opencode global install: opencode.json under the global config dir; global config", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    try {
+      const report = await runInstall({
+        cwd: project,
+        home,
+        nonInteractive: true,
+        targets: ["opencode"],
+        global: true,
+        baseUrl: mock.url,
+        model: "qwen2.5vl:7b",
+      });
+      const globalFile = opencodeConfigFile(project, home, true);
+      assert.ok(existsSync(globalFile), "global opencode.json written");
+      const data = json(globalFile);
+      assert.ok((data.mcp as Record<string, unknown>)["deepseek-vl"], "MCP entry in global opencode.json");
+      assert.ok(!existsSync(join(project, "opencode.json")), "no project opencode.json in global scope");
+      assert.ok(!existsSync(join(project, ".agents")), "no shared skill on a global install");
+      assert.ok(existsSync(join(home, ".deepseek-vl", "config.json")), "config written globally");
+      assert.equal(report.agents?.find((a) => a.agent === "opencode")?.status, "ok");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
 });
 
 test("codex project scope: writes .agents/skills/deepseek-vision/SKILL.md (packaged content); uninstall removes only it", async () => {

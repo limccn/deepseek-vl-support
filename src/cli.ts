@@ -20,7 +20,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.2.1";
+const VERSION = "0.2.2";
 
 interface ParsedArgs {
   flags: Map<string, string>;
@@ -80,7 +80,7 @@ function fail(msg: string): never {
 
 function printHelp(): void {
   process.stdout.write(
-    `deepseek-vl-support v${VERSION} — vision for DeepSeek in Claude Code / Codex
+    `deepseek-vl-support v${VERSION} — vision for DeepSeek in Claude Code / Codex / OpenCode
 
 Usage:
   deepseek-vl-support describe <image-file> [question...]   Describe an image (text output)
@@ -92,15 +92,25 @@ Usage:
   deepseek-vl-support version                              Print version
 
 install options: --target <agent,...> --global --update --dry-run
-                 --non-interactive --preset <id> --base-url <url> --model <id>
+                 --non-interactive --preset <id|later> --base-url <url> --model <id>
                  --api-key <key> --fallbacks <json|"m@url,..."> --dir <project>
 uninstall options: --target <agent,...> --global --purge-config --dry-run
 
-Agents (--target, comma-separated, default claude,codex):
+Agents (--target, comma-separated, default: claude,codex plus the agents
+detected on this machine):
   claude        Claude Code hook + skill + /vision command (project or global)
   codex         Codex MCP server + AGENTS.md (project or global; project scope
                 also writes .agents/skills/deepseek-vision/ — readable by
                 Cursor, GitHub Copilot, Kimi Code, etc.)
+  opencode      OpenCode: MCP server in opencode.json (project or global) +
+                shared .agents/skills/ skill
+  trae          Trae: skill copied to .trae/skills/ + manual import/MCP
+                guidance (project scope)
+  pi            Pi Coding Agent: shared .agents/skills/ skill; MCP written to
+                ~/.pi/agent/mcp.json only when pi-mcp-adapter is detected,
+                otherwise guidance (project scope)
+  dsh           DeepSeek Harness: shared .agents/skills/ skill + MCP guidance
+                (project scope)
   copilot       GitHub Copilot via Agent Plugins (always global)
   cursor        Cursor via Agent Plugins (always global)
   kiro          Kiro via Agent Plugins (always global)
@@ -115,6 +125,10 @@ Agents (--target, comma-separated, default claude,codex):
 --clients <list> (legacy): filter for plugin agents in non-interactive runs;
   effective plugin agents = --target ∩ --clients. The old --target plugin
   value is gone: use e.g. --target copilot,cursor instead.
+
+--preset later: skip the endpoint questions — config is written without a
+  model; images cannot be described until one is set (config set model / env
+  VISION_MODEL). The wizard also offers "Decide later" as its last preset.
 
 Config resolution: env VISION_* > project .deepseek-vl/config.json >
 global ~/.deepseek-vl/config.json > defaults.

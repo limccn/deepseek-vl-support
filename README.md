@@ -28,7 +28,11 @@ remove. MIT licensed.
 
 ## Who this is for
 
-- You use **Claude Code** or **Codex** with a DeepSeek (or other text-only) model.
+- You use a text-only model (such as DeepSeek) in any of the supported agents:
+  native — Claude Code, Codex, OpenCode; skill-based — Trae, Pi Coding Agent,
+  DeepSeek Harness; Agent Plugins clients — GitHub Copilot, Cursor, Kiro,
+  OpenClaw, Hermes Agent, VS Code, ChatGPT & Codex, Grok Bot, NanoClaw, and
+  other spec-compliant agents.
 - You want that model to understand pictures: error screenshots, UI mockups,
   charts, photos of notes.
 
@@ -44,7 +48,8 @@ remove. MIT licensed.
    **LM Studio** (these run on your own computer). The **API key** is a secret
    code from that service (usually under "API keys" on its website). The
    installer asks for it once and stores it only on your computer.
-3. Claude Code or Codex already installed.
+3. Any of the supported agents above already installed — a plugin client, a
+   skill-based agent, or Claude Code / Codex / OpenCode.
 
 ## Install (about 2 minutes)
 
@@ -55,18 +60,48 @@ cd path/to/your/project
 npx deepseek-vl-support@latest install
 ```
 
+**No CLI? Let your agent install it from GitHub.** The 10 Agent Plugins
+clients (GitHub Copilot, Cursor, Kiro, OpenClaw, Hermes Agent, VS Code,
+ChatGPT & Codex, Grok Bot, NanoClaw, and other spec-compliant agents) can
+install the plugin themselves — no terminal needed. Just ask in the
+conversation:
+
+> Install the plugin from https://github.com/limccn/deepseek-vl-support and enable it
+
+It works because the repo root is an Agent Plugins v1.0.0 plugin
+(`plugin.json` + `mcp.json` + `skills/`), and open-standard agents install
+plugins straight from a GitHub repo URL. Two caveats: (a) this only covers the
+Agent Plugins clients above — Claude Code, Codex, OpenCode, Trae, Pi, and
+DeepSeek Harness do not support the standard and must use the npx wizard; (b)
+a GitHub install brings the plugin only, it does not create
+`~/.deepseek-vl/config.json` — configure the vision endpoint afterwards with
+`npx deepseek-vl-support@latest install --target <client>` or environment
+variables (see [Configuration via environment
+variables](#configuration-via-environment-variables)). Per-client install
+commands are in [Agent Plugins mode](#agent-plugins-mode-10-compatible-clients).
+
 A numbered menu appears and asks 7 questions. **Most have a sensible default —
 just press Enter to accept it.**
 
 | # | Question | What it means | Default |
 |---|---|---|---|
-| 1 | Which agents should get vision? | Pick one or more (comma-separated numbers): `claude`, `codex`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other` — plugin clients not found on this machine are flagged "not detected" (manual instructions) | claude, codex + detected plugin clients |
-| 2 | Vision endpoint preset | Which "eyes provider" to use — pick the one you have an account for (see the endpoint table below) | openrouter |
+| 1 | Which agents should get vision? | Pick one or more (comma-separated numbers): `claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`. Selected agents that were **not detected** on this machine are flagged during install with an "install it first" hint — non-blocking, the manual guidance still prints | claude, codex + the agents detected on this machine |
+| 2 | Vision endpoint preset | Which "eyes provider" to use — pick the one you have an account for (see the endpoint table below), or choose **Decide later** (last option) to skip endpoint configuration for now | openrouter |
 | 3 | Base URL | The address of that service (the preset fills this in) | from preset |
 | 4 | API key | Your secret code for that service; stored only on your computer | Enter skips |
 | 5 | Vision model id | Which "eyes" to use (the preset fills this in) | from preset |
 | 6 | Fallback models | Backup "eyes" if the main one fails (optional) | Enter skips |
-| 7 | Install scope | This project only, or all your projects | project |
+| 7 | Install scope | This project only (recommended), or all your projects. Only asked when a native agent (`claude`, `codex`, `opencode`) is selected | project |
+
+**Decide later**: choosing it (or `--preset later` in non-interactive runs) skips
+the Base URL / API key / model / fallback questions — everything else installs
+normally, but the installer prints:
+
+> Vision not configured: images cannot be described until a model is set.
+
+Fix it any time with `npx deepseek-vl-support@latest config set model <id>`
+(plus `config set baseUrl <url>` if you are not using the default), or set the
+`VISION_MODEL` / `VISION_BASE_URL` environment variables.
 
 When it finishes:
 
@@ -159,11 +194,51 @@ npx deepseek-vl-support@latest config set maxBytes 5242880
 Describing the same picture twice is free: results are cached on your machine
 (64 MB limit). Change the picture and it gets described again.
 
+## Configuration via environment variables
+
+Every setting can also be set through environment variables instead of config
+files. They apply to all consumers — the Claude Code hook, the MCP server
+plugin clients launch, and the `describe` CLI all read the same merged config —
+and you do not need to re-run the installer after changing them.
+
+| Variable | What it sets | Example value |
+|---|---|---|
+| `VISION_BASE_URL` | The vision service address | `https://api.moonshot.cn/v1` |
+| `VISION_MODEL` | The vision model id | `moonshot-v1-32k-vision-preview` |
+| `VISION_API_KEY` | Your secret API key | `sk-...` |
+| `VISION_TIMEOUT_MS` | How long to wait for one description (ms) | `120000` |
+| `VISION_MAX_BYTES` | Pictures bigger than this are skipped | `10485760` |
+| `VISION_FALLBACKS` | Fallback models, `model@baseUrl` comma-separated | `qwen/qwen2.5-vl-72b-instruct@https://api.siliconflow.cn/v1` |
+| `VISION_DISABLE` | Switch vision off entirely (`1` / `true`) | `1` |
+
+Precedence: environment variables override the config files field by field —
+`VISION_*` > project `.deepseek-vl/config.json` > global
+`~/.deepseek-vl/config.json` > built-in defaults. This is also the simplest
+way to configure vision after the GitHub prompt install described above,
+which creates no config file at all.
+
+Bash:
+
+```bash
+export VISION_BASE_URL="https://api.moonshot.cn/v1"
+export VISION_MODEL="moonshot-v1-32k-vision-preview"
+export VISION_API_KEY="sk-..."
+```
+
+PowerShell:
+
+```powershell
+$env:VISION_BASE_URL = "https://api.moonshot.cn/v1"
+$env:VISION_MODEL = "moonshot-v1-32k-vision-preview"
+$env:VISION_API_KEY = "sk-..."
+```
+
 ## Troubleshooting
 
 | Symptom | What to do |
 |---|---|
 | The model still doesn't describe pictures | 1) Restart the session (required after install). 2) Run `… doctor` and look for `[OK]`. |
+| `doctor` shows "VISION_MODEL not set" / no model configured | You chose **Decide later** during install. Configure a model now: `config set model <id>` (plus `config set baseUrl <url>` if not using the default), or set the `VISION_MODEL` / `VISION_BASE_URL` environment variables (see [Configuration via environment variables](#configuration-via-environment-variables)). |
 | `doctor` shows "unreachable" or no `[OK]` | The service address or key is wrong: check the base URL ends with `/v1` and the API key is correct. (If the service hides its model list, `doctor` shows a warning instead — that is fine as long as it says reachable.) |
 | "image too large" hint | The picture exceeds the limit — compress or crop it (e.g. under 5 MB, long side ~2000 px), or raise the limit with `config set maxBytes …`. |
 | Descriptions are slow | Lower the limit (`config set maxBytes 5242880`) or switch to a faster endpoint. |
@@ -196,9 +271,9 @@ Full settings example (`.deepseek-vl/config.json`, editable via
 - **Fallbacks**: if the main service fails (network error / timeout / empty
   answer), the tool retries with the next one, in order, sharing one time
   budget. `doctor --all` checks each entry.
-- **Environment variables** override the file (field by field): `VISION_BASE_URL`,
-  `VISION_MODEL`, `VISION_API_KEY`, `VISION_FALLBACKS`, `DVLS_TARGET`,
-  `DVLS_SCOPE`.
+- **Environment variables** override the file (field by field): see
+  [Configuration via environment variables](#configuration-via-environment-variables);
+  install-time `DVLS_TARGET` / `DVLS_SCOPE` behave the same way.
 - **Non-interactive / CI install** (no menu; all answers as flags):
 
 ```bash
@@ -206,14 +281,44 @@ npx deepseek-vl-support@latest install --non-interactive \
   --target claude,codex --preset custom \
   --base-url https://api.moonshot.cn/v1 --model moonshot-v1-32k-vision-preview \
   --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
+
+# skip endpoint configuration entirely (same as the wizard's "Decide later")
+npx deepseek-vl-support@latest install --non-interactive --target opencode --preset later
 ```
 
 `--target` takes a comma-separated agent list
-(`claude`, `codex`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`,
-`vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`);
-the default is `claude,codex`. Any combination is allowed — e.g.
-`--target claude,copilot` installs the Claude Code hook AND registers the
-plugin with Copilot in one run.
+(`claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `copilot`, `cursor`,
+`kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`,
+`other`);
+the default is `claude,codex` plus the agents detected on this machine. Any
+combination is allowed — e.g. `--target claude,copilot` installs the Claude
+Code hook AND registers the plugin with Copilot in one run. To skip the
+endpoint configuration entirely, pass `--preset later`.
+
+## Skill-based agents (OpenCode / Trae / Pi / DeepSeek Harness)
+
+Four agents read [Agent Skills](https://agent-skills.org) but do not implement
+the Agent Plugins open standard, so they get their own integration (`--target
+opencode,trae,pi,dsh`). OpenCode is a native agent, so its artifacts
+(`opencode.json` + the shared skill) follow the install scope you choose. The
+skill-copy agents trae/pi/dsh are **project scope only** and never trigger the
+install-scope question:
+
+| Agent | What the installer does | Verify / notes |
+|---|---|---|
+| OpenCode (`opencode`) | MCP server entry in `opencode.json` (`mcp.deepseek-vl`, `type: local`, `npx -y deepseek-vl-support mcp`, `enabled: true`) + the shared `.agents/skills/` skill. Project or global by the install scope; the file is deep-merged (your other keys and MCP servers are never touched) and backed up to `opencode.json.bak` before the first change | OpenCode reads `.agents/skills/` natively; restart OpenCode, then ask for a screenshot description |
+| Trae (`trae`) | skill copied to `.trae/skills/deepseek-vision/` + manual import guidance (Settings → Rules & Skills → Create/Import) + optional manual MCP setup (Settings → MCP) | Trae is an IDE — there is no CLI automation; the MCP entry is manual (Trae's config paths are unverified) |
+| Pi Coding Agent (`pi`) | shared `.agents/skills/` skill; writes `mcpServers.deepseek-vl` to `~/.pi/agent/mcp.json` **only when the pi-mcp-adapter extension is detected** (file or `~/.pi/agent/npm/` present), otherwise prints install guidance for it | pi core has no MCP — install the adapter (`pi install npm:pi-mcp-adapter`), restart pi, re-run the installer |
+| DeepSeek Harness (`dsh`) | shared `.agents/skills/` skill (dsh reads `<project>/.agents/skills` at rank 200) + MCP guidance for the dev-preview `@deepseek-ai/dsh-mcp-client` plugin (`cordis.patch.yml`) | MCP is manual — dsh has no built-in MCP support |
+
+Selected-but-undetected agents are flagged non-blockingly at install time:
+`⚠ <Label> was not detected on this machine — install it first (<hint>).`
+
+Uninstall ownership: `uninstall --target opencode|pi|dsh` removes each agent's
+own artifacts (the opencode.json / mcp.json entries) but **keeps** the shared
+`.agents/skills/deepseek-vision/` tree — it may be used by other agents. Only
+`uninstall --target codex` removes the shared skill tree (or delete the
+directory yourself).
 
 ## Agent Plugins mode (10 compatible clients)
 

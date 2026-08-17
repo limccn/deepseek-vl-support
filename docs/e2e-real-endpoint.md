@@ -83,6 +83,11 @@ Run inside a clean directory against a Claude Code project:
 3. In the session ask: "use mcp__deepseek-vl__describe_image on <path>, then
    analyze the screenshot from the description".
 4. `mcp__deepseek-vl__vision_status` self-checks the endpoint and model.
+5. Non-interactive `codex exec`: MCP tool calls are auto-approved only with
+   `--dangerously-bypass-approvals-and-sandbox`; add the `-c` MCP overrides
+   shown in the §9.0.1 record when the project is not in
+   `~/.codex/config.toml` trust list (or use an interactive session, which
+   asks once and then runs).
 
 ## 7. Fallback chain (optional)
 
@@ -175,11 +180,19 @@ defect.
       `npx -y deepseek-vl-support@0.2.1 install --non-interactive --target
       claude --base-url https://api.moonshot.cn/v1 --model
       moonshot-v1-32k-vision-preview --api-key <key>`.
-- [x] **Codex: skipped as a todo (user decision)**. 0.142.5 does not load
-      project-scope `.codex/config.toml` MCP without project trust;
-      `-c` override proves the config valid. Non-interactive `codex exec`
-      loads the MCP tools but cannot approve tool calls. An interactive
-      session on the user's machine remains open.
+- [x] **Codex MCP E2E (completed 2026-08-14)**: clean-room project installed
+      `--target codex` from npm 0.2.1 (Moonshot endpoint). The temp project is
+      not in the `~/.codex` trust list, so project-scope `.codex/config.toml`
+      is not auto-loaded; the documented `-c` override supplies the same MCP
+      server and `codex mcp list --json` reports `deepseek-vl` enabled.
+      `codex exec --dangerously-bypass-approvals-and-sandbox -c 'mcp_servers.deepseek-vl.command="npx"'
+      -c 'mcp_servers.deepseek-vl.args=["-y", "deepseek-vl-support@0.2.1", "mcp"]'
+      -c 'mcp_servers.deepseek-vl.tool_timeout_sec=180'` called the real
+      `mcp__deepseek-vl__describe_image` on the known test PNG and returned
+      `[Vision of ... (model: moonshot-v1-32k-vision-preview)]` containing
+      "VISION TEST 0.2.1" and the red rectangle; `vision_status` reports
+      `[OK]` after the documented cold-CDN retry. Interactive handoff is no
+      longer required for this path.
 - [x] **Copilot (static)**: `copilot plugin list` lists
       `deepseek-vl-support` — labeled `v0.2.0` because Copilot resolves the
       plugin version from the **GitHub marketplace** (repo `plugin.json`
@@ -199,6 +212,29 @@ defect.
       command; `.codex/config.toml` MCP section + AGENTS.md block +
       `.agents/skills/`; copilot CLI uninstall + `settings.json` entries;
       `~/.deepseek-vl` deleted) and the E2E sandbox dir was removed.
+
+### 9.0.2 0.2.2 record — 16-agent install rework + wizard UX (2026-08-17)
+
+0.2.2 scope: four new agents (OpenCode / Trae / Pi / DeepSeek Harness — the
+"skill" agent kind), wizard UX rework (pure-name labels, project scope
+recommended, "Decide later" preset), GitHub prompt-install documentation.
+
+- [ ] Real-machine install: `--target opencode,trae,pi,dsh` in a clean-room
+      project — opencode.json MCP entry + shared `.agents/skills/` +
+      `.trae/skills/` copy; uninstall removes per-agent artifacts and keeps
+      the shared skill (codex owns its removal).
+- [ ] Wizard non-interactive paths: `--preset later` warning + config without
+      model; scope question only for native agents.
+- [ ] Real-endpoint `describe` on 0.2.2 (Moonshot) + `doctor` [OK].
+- [ ] `npx -y deepseek-vl-support@0.2.2 version` in a clean %TEMP% dir.
+- [ ] **Codex 0.2.2 session-level: TODO — user will verify separately**.
+      (0.2.1 Codex MCP E2E completed above; 0.2.2 adds no Codex-side changes
+      beyond the wizard defaults, but the interactive session check remains
+      user-owned.)
+- [ ] **GitHub Copilot 0.2.2 session-level: TODO — user will verify
+      separately**. (0.2.2 does not change the Copilot plugin payload —
+      `plugin.json`/`mcp.json`/`.mcp.json`/`skills/` unchanged in shape; the
+      §9.1 session-level check remains user-owned.)
 
 ### 9.1 GitHub Copilot
 
