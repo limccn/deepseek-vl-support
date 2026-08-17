@@ -219,14 +219,29 @@ defect.
 "skill" agent kind), wizard UX rework (pure-name labels, project scope
 recommended, "Decide later" preset), GitHub prompt-install documentation.
 
-- [ ] Real-machine install: `--target opencode,trae,pi,dsh` in a clean-room
+- [x] Real-machine install: `--target opencode,trae,pi,dsh` in a clean-room
       project — opencode.json MCP entry + shared `.agents/skills/` +
       `.trae/skills/` copy; uninstall removes per-agent artifacts and keeps
-      the shared skill (codex owns its removal).
-- [ ] Wizard non-interactive paths: `--preset later` warning + config without
-      model; scope question only for native agents.
-- [ ] Real-endpoint `describe` on 0.2.2 (Moonshot) + `doctor` [OK].
-- [ ] `npx -y deepseek-vl-support@0.2.2 version` in a clean %TEMP% dir.
+      the shared skill (codex owns its removal). Verified 2026-08-17: install
+      from npm 0.2.2 wrote all artifacts (each agent also printed its
+      not-detected notice); `uninstall --target opencode` removed only the
+      `mcp["deepseek-vl"]` entry (with `.bak`) and printed the shared-skill
+      keep note; `--target trae` removed the whole `.trae/skills/deepseek-vision`
+      tree; the shared skill survived both, then `--target codex` removed it
+      by marker (codex was never installed in that project).
+- [x] Wizard non-interactive paths: `--preset later` printed the warning +
+      wrote config without a model ("model not set!"); on this machine doctor
+      then fell back to the real global `~/.deepseek-vl/config.json` (per the
+      env > project > global > defaults chain) and reported [OK] — expected,
+      not a defect. Scope question is interactive-only; non-interactive scope
+      behavior is covered by the automated tests.
+- [x] Real-endpoint `describe` on 0.2.2 (Moonshot): generated a test PNG with
+      "VISION TEST 0.2.2" in red on white — the model read the text, color, and
+      layout correctly. Cache hit on the second call (1 cache entry).
+      `doctor` [OK] (12 models listed; the first doctor run timed out
+      transiently, a retry succeeded).
+- [x] `npx -y deepseek-vl-support@0.2.2 version` in a clean %TEMP% dir printed
+      `deepseek-vl-support v0.2.2`.
 - [ ] **Codex 0.2.2 session-level: TODO — user will verify separately**.
       (0.2.1 Codex MCP E2E completed above; 0.2.2 adds no Codex-side changes
       beyond the wizard defaults, but the interactive session check remains
