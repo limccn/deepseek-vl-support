@@ -45,10 +45,17 @@ await cp(join(root, "src/assets"), join(root, "assets"), { recursive: true });
 await mkdir(join(root, "skills", "deepseek-vision"), { recursive: true });
 await cp(join(root, "assets", "SKILL.md"), join(root, "skills", "deepseek-vision", "SKILL.md"));
 
+// Progressive disclosure (Agent Skills spec): the SKILL.md body references
+// references/vision-prompt.md, so the packaged skill dir must be
+// self-contained. Same source as the Claude install template reference
+// (assets/skill-references/vision-prompt.md).
+await mkdir(join(root, "skills", "deepseek-vision", "references"), { recursive: true });
+await cp(join(root, "assets", "skill-references", "vision-prompt.md"), join(root, "skills", "deepseek-vision", "references", "vision-prompt.md"));
+
 // Copilot's native MCP convention reads .mcp.json, not the spec mcp.json
 // (real-machine finding R4). Ship a byte-identical copy at the repo root,
 // synced here and committed to git (the repo is a Copilot install source).
 // Spec clients ignore it; Copilot gets its native file.
 await cp(join(root, "mcp.json"), join(root, ".mcp.json"));
 
-console.log("build ok: dist/cli.js + dist/hook.cjs + assets/ + skills/deepseek-vision/SKILL.md + .mcp.json");
+console.log("build ok: dist/cli.js + dist/hook.cjs + assets/ + skills/deepseek-vision/{SKILL.md,references/vision-prompt.md} + .mcp.json");

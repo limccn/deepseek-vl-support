@@ -2,7 +2,7 @@
 # deepseek-vl-support:skill
 name: deepseek-vision
 description: Describe images (screenshots, error screens, UI mockups, charts) in detail when the current model cannot see images. Trigger words: screenshot, image, UI, mockup, chart, error screenshot
-allowed-tools: Bash, Read
+allowed-tools: Bash Read
 ---
 
 # deepseek-vision — Describe images
@@ -31,6 +31,11 @@ or, if the `deepseek-vl-support` bin is on PATH:
 ```bash
 deepseek-vl-support describe "<image file path>"
 ```
+
+The command is identical in bash, zsh (macOS default), and PowerShell
+(Windows): quote paths containing spaces with `"`. No shell-specific
+syntax or call operator is needed — `npx` resolves via its `.cmd` shim
+under PowerShell.
 
 Read the returned description and use it for reasoning. Large images (over
 `maxBytes`, default 10 MB) are rejected with a clear error — compress or crop

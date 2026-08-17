@@ -154,7 +154,10 @@ env（`VISION_BASE_URL`/`VISION_MODEL`/`VISION_API_KEY`/`VISION_TIMEOUT_MS`/`VIS
   触发词：截图/screenshot、UI、设计稿/mockup、图表/chart、报错截图、图片/描述）。
   正文：何时用（模型需要理解图片但看不到/读图结果被拦截时主动调用）、怎么用
   （Bash 跑 `npx deepseek-vl-support describe <file> "<问题>"`）、视觉提示词定制入口
-  （references/vision-prompt.md）、失败指引（doctor）。`allowed-tools: Bash, Read`。
+  （references/vision-prompt.md）、失败指引（doctor）。`allowed-tools: Bash Read`（空格分隔，
+  对齐 Agent Skills 开放规范 https://agentskills.io/specification；CC 官方文档明确接受
+  空格/逗号/YAML 列表三种形式，空格形式对规范跟随实现可移植，详见
+  docs/spec/agentskills-conformance.md）。
 - `.claude/commands/vision.md`：命令体让模型跑 `npx deepseek-vl-support doctor`（可选 URL 参数）并报告。
 
 ## 7. Codex 设计

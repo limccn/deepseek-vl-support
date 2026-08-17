@@ -588,14 +588,21 @@ test("codex project scope: writes .agents/skills/deepseek-vision/SKILL.md (packa
       assert.ok(existsSync(written), ".agents/skills/deepseek-vision/SKILL.md written for project-scope codex");
       assert.equal(text(written), text(join(ROOT, "skills", "deepseek-vision", "SKILL.md")), "content equals the packaged skill");
       assert.ok(text(written).includes(SKILL_MARKER), "written skill carries the identity marker");
+      // progressive disclosure: the references file is written too, so the
+      // skill dir is self-contained (same packaged source as SKILL.md)
+      const ref = join(project, ".agents", "skills", "deepseek-vision", "references", "vision-prompt.md");
+      assert.ok(existsSync(ref), "references/vision-prompt.md written for project-scope codex");
+      assert.equal(text(ref), text(join(ROOT, "skills", "deepseek-vision", "references", "vision-prompt.md")), "references content equals the packaged copy");
+      assert.ok(text(ref).includes(SKILL_MARKER), "written references file carries the identity marker");
       assert.ok(report.output.some((l) => l.includes(".agents/skills")), `write is logged: ${report.output.join("|")}`);
 
       // re-install is idempotent (managed file, no --update)
       const again = await runInstall({ cwd: project, home, nonInteractive: true, targets: ["codex"], baseUrl: mock.url, model: "qwen2.5vl:7b" });
       assert.ok(again.output.some((l) => l.includes("exists (managed)")), `idempotent second run: ${again.output.join("|")}`);
 
-      // uninstall removes ONLY the deepseek-vision skill dir
+      // uninstall removes ONLY the deepseek-vision skill dir (incl. references/)
       const un = await runUninstall({ cwd: project, home, targets: ["codex"] });
+      assert.ok(!existsSync(join(project, ".agents", "skills", "deepseek-vision", "references")), "references/ removed on uninstall");
       assert.ok(!existsSync(join(project, ".agents", "skills", "deepseek-vision")), "our skill dir removed");
       assert.ok(existsSync(join(project, ".agents", "skills", "sibling", "SKILL.md")), "sibling skill untouched");
       assert.ok(un.agents?.find((a) => a.agent === "codex")?.detail.includes(".agents/skills"), "codex uninstall detail mentions the skill dir");

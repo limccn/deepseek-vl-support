@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { delimiter, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 import { runInstall, runUninstall } from "../src/install.ts";
 import {
   detectPluginClients,
@@ -162,6 +162,67 @@ test("static compliance: skills/deepseek-vision/SKILL.md matches assets/SKILL.md
   assert.match(repoCopy, /^---\r?\n/);
   assert.match(repoCopy, /^name: deepseek-vision$/m);
   assert.match(repoCopy, /^description: .+$/m);
+});
+
+test("AgentSkills conformance: every deepseek-vision SKILL.md copy follows agentskills.io (name/description/allowed-tools/references)", () => {
+  // Product copies of the skill: template sources (src/assets, assets build
+  // product), the packaged skill dir (skills/, the .agents install source),
+  // and the repo's own installed .agents copy. All must stay byte-identical
+  // (build.mjs syncs assets/ → skills/; the .agents copy is installer output).
+  const copies = [
+    join(ROOT, "src", "assets", "SKILL.md"),
+    join(ROOT, "assets", "SKILL.md"),
+    join(ROOT, "skills", "deepseek-vision", "SKILL.md"),
+    join(ROOT, ".agents", "skills", "deepseek-vision", "SKILL.md"),
+  ];
+  const bodies = copies.map((p) => readFileSync(p, "utf8"));
+  for (const [i, b] of bodies.entries()) {
+    assert.match(b, /^---\r?\n/, `${copies[i]} starts with frontmatter delimiter`);
+  }
+  for (const b of bodies.slice(1)) {
+    assert.equal(b, bodies[0], "all SKILL.md copies must be byte-identical");
+  }
+  const md = bodies[0];
+
+  // frontmatter (--- delimited, per agentskills.io)
+  const fm = md.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/)?.[1];
+  assert.ok(fm, "frontmatter is --- delimited");
+  const name = fm.match(/^name:\s*(\S+)$/m)?.[1];
+  assert.ok(name, "name is present (required by the spec)");
+  assert.ok(name.length >= 1 && name.length <= 64, `name length 1-64: ${name.length}`);
+  assert.match(name, /^[a-z0-9]+(?:-[a-z0-9]+)*$/, `name is kebab-case: ${name}`);
+  assert.equal(name, "deepseek-vision", "name is the skill directory name");
+  const description = fm.match(/^description:\s*(.+)$/m)?.[1];
+  assert.ok(description && description.length >= 1 && description.length <= 1024, `description 1-1024 chars: ${description?.length}`);
+  const allowed = fm.match(/^allowed-tools:\s*(.+)$/m)?.[1];
+  assert.ok(allowed, "allowed-tools present");
+  assert.ok(!allowed.includes(","), `allowed-tools must be space-separated (spec), got: "${allowed}"`);
+  assert.ok(
+    allowed.split(/\s+/).every((t) => /^[A-Za-z][A-Za-z0-9():*.-]*$/.test(t)),
+    `space-delimited tool ids parse cleanly: "${allowed}"`,
+  );
+
+  // spec: name must equal the parent directory name — check on the deployed
+  // skill directories (the template copies live in assets/ and are validated
+  // transitively via the byte-identity assertion above)
+  for (const p of [join(ROOT, "skills", "deepseek-vision", "SKILL.md"), join(ROOT, ".agents", "skills", "deepseek-vision", "SKILL.md")]) {
+    assert.equal(basename(dirname(p)), name, `${p} sits in a directory named after the skill`);
+  }
+
+  // progressive disclosure: the packaged skill dir is self-contained — the
+  // body's references/vision-prompt.md must be packaged next to SKILL.md
+  const packagedRef = join(ROOT, "skills", "deepseek-vision", "references", "vision-prompt.md");
+  assert.ok(existsSync(packagedRef), "packaged references/vision-prompt.md exists");
+  assert.equal(
+    readFileSync(packagedRef, "utf8"),
+    readFileSync(join(ROOT, "src", "assets", "skill-references", "vision-prompt.md"), "utf8"),
+    "packaged references copy stays in sync with the template source",
+  );
+
+  // cross-shell note (R5): commands are identical in bash/zsh/pwsh — no
+  // platform-divergent copies are allowed
+  assert.match(md, /bash, zsh \(macOS default\), and PowerShell/, "cross-shell equivalence note present");
+  assert.ok(!/Windows|macOS|Linux/i.test(md.replace(/bash, zsh \(macOS default\), and PowerShell[\s\S]*/, "")), "no platform-divergent command examples");
 });
 
 // ---------------------------------------------------------------- materialize

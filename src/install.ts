@@ -547,6 +547,13 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
       report.warnings.push(`missing ${packagedSkillPath()} — run \`npm run build\` first (skipping .agents/skills write)`);
     } else {
       writeManagedFile(agentsSkillsMd, packaged, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER }, log, report.warnings);
+      // progressive disclosure: the SKILL.md body references
+      // references/vision-prompt.md, so the .agents skill dir must be
+      // self-contained (same semantics as the Claude branch)
+      const ref = readTextFile(templatePath("skill-references/vision-prompt.md"));
+      if (ref !== null) {
+        writeManagedFile(join(opts.cwd, ".agents", "skills", SKILL_DIRNAME, "references", "vision-prompt.md"), ref, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER }, log, report.warnings);
+      }
     }
   }
 
@@ -883,6 +890,7 @@ async function uninstallCodex(opts: UninstallOptions, report: UninstallReport, l
   // user-authored leftover keeps the tree).
   if (!opts.global) {
     const agentsSkillsDir = join(opts.cwd, ".agents", "skills", SKILL_DIRNAME);
+    removeFileIfManaged(join(agentsSkillsDir, "references", "vision-prompt.md"), SKILL_MARKER, report, opts);
     removeFileIfManaged(join(agentsSkillsDir, "SKILL.md"), SKILL_MARKER, report, opts);
     if (!opts.dryRun && existsSync(agentsSkillsDir)) {
       report.removed.push(...removeEmptyDirTree(agentsSkillsDir));
