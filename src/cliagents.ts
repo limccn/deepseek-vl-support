@@ -150,6 +150,11 @@ export interface CliAgentOptions {
   global?: boolean;
   update?: boolean;
   dryRun?: boolean;
+  /** Keep/overwrite answer from the install wizard (R4): passed through to
+   *  the skill-tree writes (qwen/workbuddy via writeSkillTree,
+   *  reasonix/kilo/devin via writeSharedAgentsSkill); undefined keeps the
+   *  legacy marker/update rules. */
+  skillAction?: "keep" | "overwrite";
   env?: NodeJS.ProcessEnv;
   agents?: CliAgent[];
   log?: (msg: string) => void;

@@ -20,7 +20,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.2.6";
+const VERSION = "0.2.7";
 
 interface ParsedArgs {
   flags: Map<string, string>;
@@ -141,6 +141,12 @@ detected on this machine):
 --clients <list> (legacy): filter for plugin agents in non-interactive runs;
   effective plugin agents = --target ∩ --clients. The old --target plugin
   value is gone: use e.g. --target copilot,cursor instead.
+
+--update: overwrite existing artifacts — managed files are refreshed and
+  user-written (marker-less) skill files are backed up to <file>.bak before
+  being replaced. Skips the wizard's keep/overwrite questions entirely (in
+  non-interactive runs there are no questions: --update overwrites, and the
+  legacy rules apply otherwise).
 
 --preset later: skip the endpoint questions — config is written without a
   model; images cannot be described until one is set (config set model / env

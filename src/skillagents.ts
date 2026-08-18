@@ -162,6 +162,10 @@ export interface SkillAgentOptions {
   global?: boolean;
   update?: boolean;
   dryRun?: boolean;
+  /** Keep/overwrite answer from the install wizard (R4): "keep" preserves
+   *  every existing skill file, "overwrite" replaces them (marker-less files
+   *  get a .bak first); undefined keeps the legacy marker/update rules. */
+  skillAction?: "keep" | "overwrite";
   env?: NodeJS.ProcessEnv;
   agents?: SkillModuleAgent[];
   log?: (msg: string) => void;
@@ -172,21 +176,37 @@ export interface SkillAgentOptions {
 
 /** Mirror of install.ts's writeManagedFile: never overwrite a user-authored
  *  file that lacks our marker, keep managed files without --update, dry-run
- *  prints instead of writing. Kept local (module graph stays acyclic). */
+ *  prints instead of writing; the wizard's keep/overwrite answer (`action`)
+ *  overrides the legacy rules. Kept local (module graph stays acyclic). */
 function writeManagedFile(
   target: string,
   content: string,
-  opts: { update?: boolean; dryRun?: boolean; marker: string },
+  opts: { update?: boolean; dryRun?: boolean; marker: string; action?: "keep" | "overwrite" },
   log: (msg: string) => void,
   warnings: string[],
 ): void {
   if (existsSync(target)) {
     const existing = readTextFile(target) ?? "";
-    if (!existing.includes(opts.marker)) {
-      warnings.push(`skip ${target}: exists without our marker (user-authored).`);
+    const managed = existing.includes(opts.marker);
+    if (opts.action === "keep") {
+      log(`kept ${target} (your choice — existing file untouched)`);
       return;
     }
-    if (!opts.update) {
+    if (opts.action === "overwrite" || opts.update) {
+      if (!managed) {
+        if (opts.dryRun) {
+          log(`[dry-run] would backup ${target}`);
+        } else {
+          const bak = backupFile(target);
+          log(bak ? `backed up ${target} -> ${bak}` : `backed up ${target} (backup failed, continuing)`);
+        }
+      }
+      // fall through to the shared write below
+    } else {
+      if (!managed) {
+        warnings.push(`skip ${target}: exists without our marker (user-authored).`);
+        return;
+      }
       log(`exists (managed) — keep, use --update to refresh.`);
       return;
     }
@@ -205,7 +225,7 @@ function writeManagedFile(
  *  Returns false when the packaged SKILL.md source is missing. */
 export function writeSkillTree(
   destDir: string,
-  opts: { update?: boolean; dryRun?: boolean },
+  opts: { update?: boolean; dryRun?: boolean; skillAction?: "keep" | "overwrite" },
   log: (msg: string) => void,
   warnings: string[],
 ): boolean {
@@ -214,7 +234,7 @@ export function writeSkillTree(
   writeManagedFile(
     join(destDir, "SKILL.md"),
     packaged,
-    { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER },
+    { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER, action: opts.skillAction },
     log,
     warnings,
   );
@@ -225,7 +245,7 @@ export function writeSkillTree(
     writeManagedFile(
       join(destDir, "references", "vision-prompt.md"),
       ref,
-      { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER },
+      { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER, action: opts.skillAction },
       log,
       warnings,
     );
@@ -240,7 +260,7 @@ export function writeSkillTree(
  *  unchanged). */
 export function writeSharedAgentsSkill(
   cwd: string,
-  opts: { global?: boolean; update?: boolean; dryRun?: boolean },
+  opts: { global?: boolean; update?: boolean; dryRun?: boolean; skillAction?: "keep" | "overwrite" },
   report: { warnings: string[] },
   log: (msg: string) => void,
 ): void {
@@ -401,7 +421,7 @@ function registerOpencode(opts: SkillAgentOptions, detection: SkillAgentDetectio
 
   // 1) shared skill (project scope only — opencode reads .agents/skills/
   //    natively, no AGENTS.md block needed)
-  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun }, { warnings }, log);
+  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun, skillAction: opts.skillAction }, { warnings }, log);
 
   // 2) MCP entry in opencode.json (deep-merge; user content never touched)
   let detail: string;
@@ -519,7 +539,7 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
   const home = opts.home;
   const file = piMcpFile(home);
 
-  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun }, { warnings }, log);
+  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun, skillAction: opts.skillAction }, { warnings }, log);
 
   // Adapter detection (conservative, per design §2.5): only write mcp.json
   // when the target file or the pi extensions dir (~/.pi/agent/npm/) already
@@ -594,7 +614,7 @@ function registerOmp(opts: SkillAgentOptions, detection: SkillAgentDetection): S
   const log = opts.log ?? (() => {});
   const warnings = opts.warnings ?? [];
 
-  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun }, { warnings }, log);
+  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun, skillAction: opts.skillAction }, { warnings }, log);
 
   const notDetected = detection.detected
     ? ""
@@ -642,7 +662,7 @@ function registerDsh(opts: SkillAgentOptions, detection: SkillAgentDetection): S
   const log = opts.log ?? (() => {});
   const warnings = opts.warnings ?? [];
 
-  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun }, { warnings }, log);
+  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun, skillAction: opts.skillAction }, { warnings }, log);
 
   const notDetected = detection.detected
     ? ""

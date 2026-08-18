@@ -540,3 +540,62 @@ test("dry-run writes nothing", async () => {
     await rm(base, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------- skillAction passthrough (R4/R7)
+
+test("skillAction: keep preserves a user-authored skill, overwrite backs up + replaces (R4 passthrough)", async () => {
+  const { base, project, home } = await makeEnv();
+  try {
+    // user-authored skill at the qwen target path (no marker)
+    const skillFile = skillFileOf(join(project, ".qwen"));
+    mkdirSync(join(skillFile, ".."), { recursive: true });
+    writeFileSync(skillFile, "# my own qwen skill\n", "utf8");
+
+    // keep: file untouched, no skip warning (the wizard decision overrides legacy rules)
+    const warnings: string[] = [];
+    const logs: string[] = [];
+    const kept = await installCliAgents(
+      copts(project, home, warnings, { agents: ["qwen"], skillAction: "keep", log: (m) => logs.push(m) }),
+      detectCliAgents(home, emptyPathEnv()),
+    );
+    assert.equal(kept[0].status, "ok");
+    assert.equal(text(skillFile), "# my own qwen skill\n", "keep leaves the file alone");
+    assert.ok(logs.some((m) => m.includes("kept")), `kept logged: ${logs.join(" | ")}`);
+    assert.ok(!warnings.some((w) => w.includes("user-authored")), "keep is a decision, not a warning");
+
+    // overwrite: backed up + replaced with the packaged skill
+    const warnings2: string[] = [];
+    const over = await installCliAgents(
+      copts(project, home, warnings2, { agents: ["qwen"], skillAction: "overwrite" }),
+      detectCliAgents(home, emptyPathEnv()),
+    );
+    assert.equal(over[0].status, "ok");
+    assert.ok(text(skillFile).includes(SKILL_MARKER), "overwrite replaced the file with ours");
+    assert.ok(existsSync(skillFile + ".bak"), "user-authored file backed up");
+    assert.equal(text(skillFile + ".bak"), "# my own qwen skill\n", "backup keeps the original");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("--update with a user-authored skill at a shared-tree target backs up + overwrites (R7)", async () => {
+  const { base, project, home } = await makeEnv();
+  try {
+    // reasonix project scope writes the shared .agents/skills/ tree
+    const skillFile = skillFileOf(join(project, ".agents"));
+    mkdirSync(join(skillFile, ".."), { recursive: true });
+    writeFileSync(skillFile, "# hand-written shared skill\n", "utf8");
+
+    const warnings: string[] = [];
+    const res = await installCliAgents(
+      copts(project, home, warnings, { agents: ["reasonix"], update: true }),
+      detectCliAgents(home, emptyPathEnv()),
+    );
+    assert.equal(res[0].status, "ok");
+    assert.ok(text(skillFile).includes(SKILL_MARKER), "--update replaced the user file with ours");
+    assert.ok(existsSync(skillFile + ".bak"), "user-authored file backed up");
+    assert.equal(text(skillFile + ".bak"), "# hand-written shared skill\n");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});

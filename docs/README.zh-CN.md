@@ -93,6 +93,14 @@ Trae、Pi、DeepSeek Harness 不支持该标准，必须走上面的 npx 向导�
 （不用默认端点的话再加 `config set baseUrl <url>`），或设置
 `VISION_MODEL` / `VISION_BASE_URL` 环境变量。
 
+**在已配置的项目上重跑**：如果 `config.json` 已存在，向导会问
+`Keep existing (skip config write)`（保留现有，跳过配置写入）或
+`Overwrite (merge new answers in)`（覆盖，合并新答案）——默认保留你现有的
+端点设置。选择 **Decide later**（或 `--preset later`）会静默保留已有配置。
+某个目标位置已存在技能文件（之前装过，或手写的）时，还会出现第二次确认：
+`Keep existing skills`（保留现有技能，默认）或 `Overwrite with packaged version`
+（用打包版本覆盖）。非交互安装从不提问——已有配置和技能一律保留。
+
 装完之后：
 
 1. **重启会话**——安装器会打印这条提醒，必须重启才能生效。
@@ -107,6 +115,16 @@ npx deepseek-vl-support@latest doctor
 ```bash
 npx deepseek-vl-support@latest install --dry-run
 ```
+
+**刷新安装**：要把受管文件更新到当前打包版本（例如包升级之后），带上 `--update`
+重跑：
+
+```bash
+npx deepseek-vl-support@latest install --update
+```
+
+`--update` 跳过 keep/overwrite 确认：受管文件直接刷新，手写的（无标记的）技能
+文件会在被覆盖前备份为 `<file>.bak`。
 
 > 提示：请在**你自己的项目文件夹**里运行 `npx deepseek-vl-support@latest …`。在这个工具
 > 自己的源码目录里运行会踩到一个已知的 npx 怪癖（`'deepseek-vl-support' is not

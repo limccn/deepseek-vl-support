@@ -105,6 +105,15 @@ Fix it any time with `npx deepseek-vl-support@latest config set model <id>`
 (plus `config set baseUrl <url>` if you are not using the default), or set the
 `VISION_MODEL` / `VISION_BASE_URL` environment variables.
 
+**Re-running on a configured project**: if `config.json` already exists the
+wizard asks `Keep existing (skip config write)` or `Overwrite (merge new
+answers in)` — the default keeps your current endpoint settings. Choosing
+**Decide later** (or `--preset later`) keeps the existing config without
+asking. When a skill file already exists at one of the target locations (from
+a previous install, or written by hand), a second confirmation follows: `Keep
+existing skills` (default) or `Overwrite with packaged version`. Non-interactive
+runs never ask — an existing config and existing skills are kept.
+
 When it finishes:
 
 1. **Restart the session** — the installer prints this reminder, and it is
@@ -120,6 +129,17 @@ Preview before committing (prints what would be written, writes nothing):
 ```bash
 npx deepseek-vl-support@latest install --dry-run
 ```
+
+**Refreshing an install**: to pull managed artifacts up to the current
+packaged version (for example after a package upgrade), re-run with `--update`:
+
+```bash
+npx deepseek-vl-support@latest install --update
+```
+
+`--update` skips the keep/overwrite questions: managed files are refreshed,
+and a hand-written (marker-less) skill file is backed up to `<file>.bak`
+before being replaced.
 
 > Tip: run `npx deepseek-vl-support@latest …` from **your own project folder**.
 > Running it inside this tool's own source folder hits a known npx quirk

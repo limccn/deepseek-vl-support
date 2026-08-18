@@ -175,6 +175,92 @@ export function scopeMenuSpec(seed: InstallOptions): MenuSpec {
   };
 }
 
+/** Keep/overwrite menu shown when the wizard is about to overwrite an
+ *  existing config.json (R1): Keep is the default. */
+export function configKeepMenuSpec(configFile: string): MenuSpec {
+  return {
+    prompt: `Existing config found: ${configFile}`,
+    options: [
+      { value: "keep", label: "Keep existing (skip config write)" },
+      { value: "overwrite", label: "Overwrite (merge new answers in)" },
+    ],
+    default: "keep",
+  };
+}
+
+/** Keep/overwrite menu shown when the wizard is about to overwrite existing
+ *  skill files (R4): one answer applies to every listed target. */
+export function skillKeepMenuSpec(paths: string[]): MenuSpec {
+  return {
+    prompt: `Existing skill found:\n  - ${paths.join("\n  - ")}`,
+    options: [
+      { value: "keep", label: "Keep existing skills" },
+      { value: "overwrite", label: "Overwrite with packaged version" },
+    ],
+    default: "keep",
+  };
+}
+
+/** Whether the wizard must ask the config keep/overwrite question (R1/R2/R7):
+ *  only when a real preset was picked AND the config file exists AND this is
+ *  not --update. "Decide later" keeps silently (R2); --update never asks and
+ *  deep-merges (R7). */
+export function shouldAskConfig(presetId: string, exists: boolean, update?: boolean): boolean {
+  if (update) return false;
+  if (presetId === "later") return false;
+  return exists;
+}
+
+/** Candidate skill SKILL.md paths for the selected agents — exactly mirroring
+ *  what each driver would write (22-agent baseline): claude/qwen/workbuddy
+ *  follow the install scope, the shared .agents tree is a project-level
+ *  convention (skipped for global scopes), trae is always project-level,
+ *  reasonix/kilo/devin use the scope-aware shared tree, and the plugin
+ *  clients never write skill files. Exported for tests. */
+export function existingSkillTargets(
+  targets: readonly Agent[],
+  cwd: string,
+  home: string,
+  global: boolean,
+): string[] {
+  const scopeDir = (dir: string) => (global ? join(home, dir) : join(cwd, dir));
+  const sharedTree = (base: string) => join(base, ".agents", "skills", SKILL_DIRNAME, "SKILL.md");
+  const paths: string[] = [];
+  for (const t of targets) {
+    switch (t) {
+      case "claude":
+        paths.push(join(scopeDir(".claude"), "skills", SKILL_DIRNAME, "SKILL.md"));
+        break;
+      case "codex":
+      case "opencode":
+      case "pi":
+      case "dsh":
+      case "omp":
+        // shared tree is project-level; global scopes skip the write
+        if (!global) paths.push(sharedTree(cwd));
+        break;
+      case "trae":
+        paths.push(join(cwd, ".trae", "skills", SKILL_DIRNAME, "SKILL.md"));
+        break;
+      case "qwen":
+        paths.push(join(scopeDir(".qwen"), "skills", SKILL_DIRNAME, "SKILL.md"));
+        break;
+      case "workbuddy":
+        paths.push(join(scopeDir(".codebuddy"), "skills", SKILL_DIRNAME, "SKILL.md"));
+        break;
+      case "reasonix":
+      case "kilo":
+      case "devin":
+        paths.push(sharedTree(global ? home : cwd));
+        break;
+      default:
+        // plugin clients install no skill files
+        break;
+    }
+  }
+  return [...new Set(paths)].filter((p) => existsSync(p));
+}
+
 /** Warning block shown when the user picks "Decide later" (R4): vision stays
  *  off until a model is configured. */
 export const DECIDE_LATER_WARNING =
@@ -221,6 +307,16 @@ export interface InstallAnswers {
    *  agents are always global; runInstall derives the effective config scope
    *  from `targets` (any plugin agent ⇒ global config). */
   global: boolean;
+  /** config.json write decision: "keep" skips the write (the existing file
+   *  stays untouched); "write" deep-merges the new answers in. Interactive
+   *  runs ask when the file exists (except "Decide later", which keeps
+   *  silently); non-interactive runs always write. */
+  configWrite: "write" | "keep";
+  /** Skill overwrite decision from the wizard: "keep" preserves every
+   *  existing skill target, "overwrite" replaces them (user-authored files
+   *  get a .bak first). undefined = legacy rules (non-interactive and
+   *  --update runs never ask). */
+  skillAction?: "keep" | "overwrite";
   /** Advisory lines produced during answer collection (e.g. the "Decide
    *  later" warning); printed verbatim by runInstall before the install
    *  steps. */
@@ -350,6 +446,37 @@ async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.Proce
     needsScopeQuestion(targets) &&
     (await askMenu(scopeMenuSpec(seed))) === "global";
 
+  // config.json keep/overwrite (R1/R2/R7): same effective scope math as
+  // runInstall (any plugin agent ⇒ global config). "Decide later" keeps an
+  // existing file silently; --update never asks (it deep-merges); otherwise
+  // an existing file triggers the keep/overwrite menu, default Keep.
+  const hasPlugin = targets.some(isPluginAgent);
+  const configGlobal = hasPlugin || global;
+  const configFile = join(
+    configGlobal ? globalConfigDir(home) : join(seed.cwd, CONFIG_DIR),
+    "config.json",
+  );
+  const cfgExists = existsSync(configFile);
+  const configWrite: "write" | "keep" =
+    cfgExists && presetId === "later"
+      ? "keep"
+      : shouldAskConfig(presetId, cfgExists, seed.update)
+        ? (await askMenu(configKeepMenuSpec(configFile))) === "keep"
+          ? "keep"
+          : "write"
+        : "write";
+
+  // skill keep/overwrite (R4/R7): one question listing every existing skill
+  // target (mirroring the 22-agent write map), one answer for all; --update
+  // skips the question entirely.
+  const existingTargets = existingSkillTargets(targets, seed.cwd, home, global);
+  const skillAction =
+    existingTargets.length > 0 && !seed.update
+      ? (await askMenu(skillKeepMenuSpec(existingTargets))) === "overwrite"
+        ? "overwrite"
+        : "keep"
+      : undefined;
+
   return {
     targets,
     baseUrl: baseUrl || DEFAULT_BASE_URL,
@@ -357,6 +484,8 @@ async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.Proce
     apiKey,
     fallbacks,
     global,
+    configWrite,
+    skillAction,
     notes,
   };
 }
@@ -373,25 +502,49 @@ function collectNonInteractiveAnswers(opts: InstallOptions, env: NodeJS.ProcessE
   // --preset later (R4): same meaning as the interactive "Decide later" —
   // no preset values, model stays empty unless explicitly given.
   if (opts.preset === "later" && !model) notes.push(DECIDE_LATER_WARNING);
-  return { targets, baseUrl, model, apiKey, fallbacks, global, notes };
+  // Non-interactive runs never ask (R3): always deep-merge the config, keep
+  // the legacy skill rules.
+  return { targets, baseUrl, model, apiKey, fallbacks, global, configWrite: "write", notes };
 }
 
 // ---------------------------------------------------------------- file helpers
 
+/** Marker-checked write with the keep/overwrite semantics from the wizard
+ *  (R4/R7): `action` comes from the interactive answer — "keep" preserves the
+ *  existing file (overriding every legacy rule), "overwrite" replaces it and
+ *  backs up user-authored (marker-less) files first. undefined keeps the
+ *  legacy rules: user-authored files are skipped with a warning, managed
+ *  files are kept unless --update (which now backs up and overwrites
+ *  user-authored files too — R7). dry-run only prints. */
 function writeManagedFile(
   target: string,
   content: string,
-  opts: { update?: boolean; dryRun?: boolean; marker: string },
+  opts: { update?: boolean; dryRun?: boolean; marker: string; action?: "keep" | "overwrite" },
   log: (msg: string) => void,
   warnings: string[],
 ): void {
   if (existsSync(target)) {
     const existing = readTextFile(target) ?? "";
-    if (!existing.includes(opts.marker)) {
-      warnings.push(`skip ${target}: exists without our marker (user-authored).`);
+    const managed = existing.includes(opts.marker);
+    if (opts.action === "keep") {
+      log(`kept ${target} (your choice — existing file untouched)`);
       return;
     }
-    if (!opts.update) {
+    if (opts.action === "overwrite" || opts.update) {
+      if (!managed) {
+        if (opts.dryRun) {
+          log(`[dry-run] would backup ${target}`);
+        } else {
+          const bak = backupFile(target);
+          log(bak ? `backed up ${target} -> ${bak}` : `backed up ${target} (backup failed, continuing)`);
+        }
+      }
+      // fall through to the shared write below
+    } else {
+      if (!managed) {
+        warnings.push(`skip ${target}: exists without our marker (user-authored).`);
+        return;
+      }
       log(`exists (managed) — keep, use --update to refresh.`);
       return;
     }
@@ -475,13 +628,14 @@ async function installClaude(opts: InstallOptions, answers: InstallAnswers, repo
     writeManagedFile(hookPath, hookSource, { update: opts.update, dryRun: opts.dryRun, marker: HOOK_MARKER }, log, report.warnings);
   }
 
-  // 2) skill
+  // 2) skill (the wizard's keep/overwrite answer applies to skill files;
+  //    hook and slash command keep the legacy marker rules — R4)
   const skillMd = readTextFile(templatePath("SKILL.md"));
   if (skillMd !== null) {
-    writeManagedFile(join(skillDir, "SKILL.md"), skillMd, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER }, log, report.warnings);
+    writeManagedFile(join(skillDir, "SKILL.md"), skillMd, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER, action: answers.skillAction }, log, report.warnings);
     const ref = readTextFile(templatePath("skill-references/vision-prompt.md"));
     if (ref !== null) {
-      writeManagedFile(join(skillDir, "references", "vision-prompt.md"), ref, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER }, log, report.warnings);
+      writeManagedFile(join(skillDir, "references", "vision-prompt.md"), ref, { update: opts.update, dryRun: opts.dryRun, marker: SKILL_MARKER, action: answers.skillAction }, log, report.warnings);
     }
   }
 
@@ -563,7 +717,7 @@ async function installCodex(opts: InstallOptions, answers: InstallAnswers, repor
   //    skillagents.ts; the content is the packaged skill (assets/SKILL.md,
   //    committed as skills/deepseek-vision/SKILL.md), which carries
   //    SKILL_MARKER so uninstall can tell our file from a user-authored one.
-  writeSharedAgentsSkill(opts.cwd, { global: answers.global, update: opts.update, dryRun: opts.dryRun }, report, log);
+  writeSharedAgentsSkill(opts.cwd, { global: answers.global, update: opts.update, dryRun: opts.dryRun, skillAction: answers.skillAction }, report, log);
 
   // models.json bug fix (#36382)
   const modelsPath = findModelsJson(opts.cwd, home);
@@ -647,8 +801,11 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   // advisory notes collected during answer collection ("Decide later")
   for (const n of answers.notes) log(n);
 
-  // 1) config.json (deep-merge write)
-  if (opts.dryRun) {
+  // 1) config.json (deep-merge write; the wizard can decide to keep the
+  //    existing file untouched — R1/R2)
+  if (answers.configWrite === "keep") {
+    log(`config kept: ${configFile} (existing file untouched)`);
+  } else if (opts.dryRun) {
     log(`[dry-run] would write config to ${configFile} (baseUrl=${answers.baseUrl}, model=${answers.model || "(unset)"}, fallbacks=${answers.fallbacks.length})`);
   } else {
     const merged = writeConfigFile(configFile, {
@@ -702,6 +859,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
           update: opts.update,
           dryRun: opts.dryRun,
           agents: skillTargets,
+          skillAction: answers.skillAction,
           log,
           warnings: report.warnings,
         },
@@ -720,6 +878,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
           update: opts.update,
           dryRun: opts.dryRun,
           agents: cliTargets,
+          skillAction: answers.skillAction,
           log,
           warnings: report.warnings,
         },

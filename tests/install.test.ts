@@ -182,30 +182,44 @@ test("re-install is idempotent: no duplicate entries, no change, hook kept", asy
   }
 });
 
-test("--update refreshes managed files; user-authored files are never overwritten", async () => {
+test("--update refreshes managed files AND backs up + overwrites user-authored skill files (R7)", async () => {
   const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
   try {
     const { base, project, home } = await makeEnv();
-    // a user-authored SKILL.md at OUR target path (no marker) blocks install
-    const userSkill = join(project, ".claude", "skills", "deepseek-vision", "SKILL.md");
-    mkdirSync(join(userSkill, ".."), { recursive: true });
-    writeFileSync(userSkill, "# My hand-written skill\n", "utf8");
     try {
-      const report = await installBoth(project, home, mock.url, { update: true });
-      assert.equal(text(userSkill), "# My hand-written skill\n", "user-authored SKILL.md untouched");
+      // a user-authored SKILL.md at OUR target path (no marker): without
+      // --update it blocks install (legacy skip); with --update it is backed up
+      // and overwritten (R7).
+      const userSkill = join(project, ".claude", "skills", "deepseek-vision", "SKILL.md");
+      mkdirSync(join(userSkill, ".."), { recursive: true });
+      writeFileSync(userSkill, "# My hand-written skill\n", "utf8");
+
+      // legacy: no --update → skip + warning, file untouched
+      const report0 = await installBoth(project, home, mock.url);
+      assert.equal(text(userSkill), "# My hand-written skill\n", "no --update: user-authored SKILL.md untouched");
       assert.ok(
-        report.warnings.some((w) => w.includes("user-authored")),
-        `expected skip warning, got: ${report.warnings.join("|")}`,
+        report0.warnings.some((w) => w.includes("user-authored")),
+        `expected skip warning, got: ${report0.warnings.join("|")}`,
+      );
+      assert.ok(!existsSync(userSkill + ".bak"), "no backup for a skipped file");
+
+      // R7: --update → backup + overwrite
+      const report = await installBoth(project, home, mock.url, { update: true });
+      assert.ok(text(userSkill).includes("deepseek-vision — Describe images"), "user-authored SKILL.md replaced by the packaged skill");
+      assert.ok(existsSync(userSkill + ".bak"), "user-authored file backed up before overwrite");
+      assert.equal(text(userSkill + ".bak"), "# My hand-written skill\n", "backup carries the original content");
+      assert.ok(
+        !report.warnings.some((w) => w.includes("user-authored")),
+        `no skip warning under --update, got: ${report.warnings.join("|")}`,
       );
 
-      // install elsewhere (no pre-existing SKILL.md) → our managed files written
-      const project2 = join(base, "project2");
-      mkdirSync(project2, { recursive: true });
-      await installBoth(project2, home, mock.url);
-      const visionCmd = join(project2, ".claude", "commands", "vision.md");
+      // managed files are refreshed too
+      const visionCmd = join(project, ".claude", "commands", "vision.md");
       writeFileSync(visionCmd, text(visionCmd) + "\nTAMPERED\n", "utf8");
-      await installBoth(project2, home, mock.url, { update: true });
+      await installBoth(project, home, mock.url, { update: true });
       assert.ok(!text(visionCmd).includes("TAMPERED"), "--update must refresh managed files");
+      // a managed-file overwrite does NOT create a backup (marker present)
+      assert.equal(text(userSkill + ".bak"), "# My hand-written skill\n", "only the user-authored backup exists");
     } finally {
       await rm(base, { recursive: true, force: true });
     }

@@ -1,6 +1,6 @@
 {
   "name": "deepseek-vl-support",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Give DeepSeek (text-only) models vision in Claude Code, Codex, and Agent Plugins clients: describe images via any OpenAI-compatible vision endpoint.",
   "license": "MIT",
   "type": "module",

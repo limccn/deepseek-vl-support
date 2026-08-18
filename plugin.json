@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "deepseek-vl-support",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
   "author": { "name": "limccn" },
   "homepage": "https://github.com/limccn/deepseek-vl-support",
