@@ -321,6 +321,10 @@ test("pi: no adapter → mcp.json never written, guidance prints the native inst
     const pi = results.find((r) => r.agent === "pi")!;
     assert.equal(pi.status, "manual");
     assert.ok(pi.detail.includes(`pi install npm:${PKG_NAME}`), `native install recommended first: ${pi.detail}`);
+    assert.ok(
+      pi.detail.includes("native extension") && pi.detail.includes("pasting an image or reading an image file is described automatically"),
+      `extension note present: ${pi.detail}`,
+    );
     assert.ok(pi.detail.includes("pi-mcp-adapter"), "adapter kept as the tooling supplement");
     assert.ok(!existsSync(join(home, ".pi", "agent", "mcp.json")), "no mcp.json without the adapter");
     assert.ok(existsSync(join(project, ".agents", "skills", SKILL_DIRNAME, "SKILL.md")), "skill installed regardless");
@@ -413,18 +417,24 @@ test("omp: detected via PATH → no undetected prefix; uninstall keeps the share
   }
 });
 
-test("package.json pi manifest: explicit skills glob pointing at an existing dir, pi-package keyword, files whitelist complete", async () => {
+test("package.json pi manifest: explicit skills+extensions globs pointing at existing dirs, pi-package keyword, files whitelist complete", async () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
-    pi?: { skills?: string[] };
+    pi?: { extensions?: string[]; skills?: string[] };
     keywords?: string[];
     files?: string[];
   };
-  assert.ok(Array.isArray(pkg.pi?.skills) && pkg.pi.skills.length > 0, "pi.skills present and non-empty (pi: {} would load nothing)");
+  assert.ok(Array.isArray(pkg.pi?.extensions) && pkg.pi.extensions.length > 0, "pi.extensions present and non-empty (pi: {} would load nothing)");
+  for (const glob of pkg.pi!.extensions!) {
+    const dir = join(ROOT, glob.replace(/^\.\//, ""));
+    assert.ok(existsSync(dir), `pi.extensions glob "${glob}" resolves to an existing directory`);
+  }
+  assert.ok(Array.isArray(pkg.pi?.skills) && pkg.pi.skills.length > 0, "pi.skills present and non-empty");
   for (const glob of pkg.pi!.skills!) {
     const dir = join(ROOT, glob.replace(/^\.\//, ""));
     assert.ok(existsSync(dir), `pi.skills glob "${glob}" resolves to an existing directory`);
   }
   assert.ok(pkg.keywords?.includes("pi-package"), "pi-package keyword for the pi.dev gallery");
+  assert.ok(pkg.files?.includes("extensions/"), "files whitelist ships extensions/");
   assert.ok(pkg.files?.includes("skills/"), "files whitelist ships skills/");
   assert.ok(pkg.files?.includes(".mcp.json") && pkg.files?.includes("mcp.json"), "files whitelist ships both mcp manifests");
 });

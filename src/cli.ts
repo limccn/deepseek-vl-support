@@ -3,7 +3,7 @@
 // npx resolves it by package name). Zero-dependency hand-rolled arg parsing;
 // subcommands: describe / doctor / config / install / uninstall / mcp / version.
 import { join } from "node:path";
-import { describe, VisionSizeError } from "./client.ts";
+import { describe, describeDataUri, VisionSizeError } from "./client.ts";
 import { runDoctor } from "./doctor.ts";
 import { parseTargets, runInstall, runUninstall } from "./install.ts";
 import { runMcpServer } from "./mcp.ts";
@@ -20,7 +20,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.2.4";
+const VERSION = "0.2.5";
 
 interface ParsedArgs {
   flags: Map<string, string>;
@@ -39,6 +39,7 @@ const VALUE_FLAGS = new Set([
   "clients",
   "dir",
   "url",
+  "data-uri",
 ]);
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -83,7 +84,8 @@ function printHelp(): void {
     `deepseek-vl-support v${VERSION} — vision for DeepSeek in Claude Code / Codex / OpenCode
 
 Usage:
-  deepseek-vl-support describe <image-file> [question...]   Describe an image (text output)
+  deepseek-vl-support describe <image-file> [question...]   Describe an image file (text output)
+  deepseek-vl-support describe --data-uri <data:...> [question...]  Describe an image passed inline as a data URI
   deepseek-vl-support doctor [--url <baseUrl>] [--all]      Diagnose the vision endpoint
   deepseek-vl-support config [get [key] | set <key> <value> | path] [--global]
   deepseek-vl-support install [options]                     One-shot installer (wizard)
@@ -153,10 +155,18 @@ global ~/.deepseek-vl/config.json > defaults.
 async function cmdDescribe(args: ParsedArgs): Promise<void> {
   // positionals[0] is the subcommand name ("describe") itself
   const file = args.positionals[1];
-  if (!file) fail("describe requires an image file path");
+  const dataUri = args.flags.get("data-uri");
+  if (dataUri === undefined && !file) {
+    fail("describe requires an image file path or --data-uri");
+  }
+  if (dataUri !== undefined && file) {
+    fail("describe accepts either an image file path or --data-uri, not both");
+  }
   const question = args.positionals.slice(2).join(" ");
   try {
-    const res = await describe(file, { question });
+    const res = dataUri !== undefined
+      ? await describeDataUri(dataUri, { question })
+      : await describe(file as string, { question });
     if (args.flags.has("json")) {
       process.stdout.write(JSON.stringify(res, null, 2) + "\n");
     } else {

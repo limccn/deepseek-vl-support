@@ -311,8 +311,8 @@ install-scope question:
 |---|---|---|
 | OpenCode (`opencode`) | MCP server entry in `opencode.json` (`mcp.deepseek-vl`, `type: local`, `npx -y deepseek-vl-support mcp`, `enabled: true`) + the shared `.agents/skills/` skill. Project or global by the install scope; the file is deep-merged (your other keys and MCP servers are never touched) and backed up to `opencode.json.bak` before the first change | OpenCode reads `.agents/skills/` natively; restart OpenCode, then ask for a screenshot description |
 | Trae (`trae`) | skill copied to `.trae/skills/deepseek-vision/` + manual import guidance (Settings → Rules & Skills → Create/Import) + optional manual MCP setup (Settings → MCP) | Trae is an IDE — there is no CLI automation; the MCP entry is manual (Trae's config paths are unverified) |
-| Pi Coding Agent (`pi`) | shared `.agents/skills/` skill; guidance prefers the native package (`pi install npm:deepseek-vl-support`) — one command gives pi the user-level skill; writes `mcpServers.deepseek-vl` to `~/.pi/agent/mcp.json` **only when the pi-mcp-adapter extension is detected** (file or `~/.pi/agent/npm/` present) | pi core has no MCP — the packaged skill works without it; for MCP tools add the adapter (`pi install npm:pi-mcp-adapter`), restart pi |
-| Oh My Pi (`omp`) | shared `.agents/skills/` skill (omp reads it at priority 70) + guidance `omp install npm:deepseek-vl-support` — one command gives omp the skill **and** automatic MCP tools (the package's `.mcp.json` is auto-registered); no config file is written (omp's user-level MCP paths are unverified) | omp is a pi fork with built-in MCP; activate with `/reload-plugins` — no restart needed |
+| Pi Coding Agent (`pi`) | shared `.agents/skills/` skill; guidance prefers the native package (`pi install npm:deepseek-vl-support`) — one command gives pi the user-level skill and a native extension (automatic image description); writes `mcpServers.deepseek-vl` to `~/.pi/agent/mcp.json` **only when the pi-mcp-adapter extension is detected** (file or `~/.pi/agent/npm/` present) | pi core has no MCP — the packaged skill works without it; for MCP tools add the adapter (`pi install npm:pi-mcp-adapter`), restart pi |
+| Oh My Pi (`omp`) | shared `.agents/skills/` skill (omp reads it at priority 70) + guidance `omp install npm:deepseek-vl-support` — one command gives omp the skill, automatic MCP tools **and** the native extension (the package's `.mcp.json` is auto-registered); no config file is written (omp's user-level MCP paths are unverified) | omp is a pi fork with built-in MCP; activate with `/reload-plugins` — no restart needed |
 | DeepSeek Harness (`dsh`) | shared `.agents/skills/` skill (dsh reads `<project>/.agents/skills` at rank 200) + MCP guidance for the dev-preview `@deepseek-ai/dsh-mcp-client` plugin (`cordis.patch.yml`) | MCP is manual — dsh has no built-in MCP support |
 
 Five more CLI agents got native support in 0.2.3 (`--target
@@ -352,17 +352,30 @@ pi install npm:deepseek-vl-support          # published package
 pi install git:github.com/limccn/deepseek-vl-support@<tag>   # from git (pinned)
 ```
 
-- What you get: the `deepseek-vision` skill at user level (pi loads only the
-  resources its `pi` manifest lists — `"pi": { "skills": ["./skills"] }`).
-  The skill is self-contained: it calls `npx deepseek-vl-support describe`,
-  so it works without any MCP setup.
+- What you get: the `deepseek-vision` skill at user level **and a native
+  extension** — pi loads only what its `pi` manifest lists
+  (`"pi": { "extensions": ["./extensions"], "skills": ["./skills"] }`). The
+  skill is self-contained: it calls `npx deepseek-vl-support describe`, so it
+  works without any MCP setup. The extension makes vision transparent:
+  pasting or dragging an image into a prompt describes it automatically and
+  injects the description into the conversation; `read` on an image file
+  returns `[Vision: …]` text instead of a "model does not support images"
+  note; `/vision` shows the endpoint + model status and a startup self-check
+  notifies you when the vision setup is incomplete.
+- The extension delegates every description to the packaged CLI
+  (`node …/dist/cli.js describe`), so it shares the exact same endpoint
+  configuration, size guard, cache and fallback chain as the skill and the
+  MCP server — configure once (`deepseek-vl-support config set …` or the
+  `VISION_*` env vars), use everywhere. The extension (transparent), the
+  skill (explicit call) and MCP tools run in parallel and never conflict.
 - MCP tools are **not** included — pi core has no MCP. If you want the
   `describe_image` / `vision_status` tools too, install the community adapter
   (`pi install npm:pi-mcp-adapter`, restart pi) and re-run this installer, or
   use the wizard's adapter-aware path.
 - Uninstall: `pi remove deepseek-vl-support` (the adapter is a separate
   package — remove it with `pi remove pi-mcp-adapter`).
-- Notes: restart pi after installing; trust the project on first run for
+- Notes: restart pi after installing — the extension module loads at startup
+  (and after every `pi update`); trust the project on first run for
   project-level skills. If you already installed the project-level skill via
   the wizard, the packaged skill is equivalent — no need to install twice.
 
@@ -375,15 +388,20 @@ omp install github:limccn/deepseek-vl-support@<tag>  # from git (pinned)
 
 - What you get: the `deepseek-vision` skill **and** automatic MCP tools —
   omp (a pi fork with built-in MCP) reads the package's `.mcp.json` and
-  registers the `deepseek-vl` server with `describe_image` / `vision_status`.
-  Activate with `/reload-plugins` — no restart needed.
+  registers the `deepseek-vl` server with `describe_image` / `vision_status`
+  — **plus the same native extension as pi** (omp loads the `pi` manifest
+  entry, so `pi.extensions` applies here too): pasted images and image
+  `read`s are described automatically, `/vision` and the startup self-check
+  are available. Activate with `/reload-plugins` — no restart needed.
 - omp falls back to the `pi` manifest key, so the same package works for both
   agents; it also reads the project `.agents/skills/` shared tree (priority
-  70), so a wizard-installed project skill is picked up as well.
+  70), so a wizard-installed project skill is picked up as well. The
+  extension shares the same configuration as the skill and MCP tools — one
+  `deepseek-vl-support config set …` or `VISION_*` setup covers all paths.
 - Uninstall: `omp plugin uninstall deepseek-vl-support`.
 - Note: omp iterates very fast — if a future version stops accepting the
-  `pi` key fallback, report it; the wizard path (shared skill + guidance)
-  keeps working regardless.
+  `pi` key fallback (extensions and skills both), report it; the wizard path
+  (shared skill + guidance) keeps working regardless.
 
 ## Agent Plugins mode (10 compatible clients)
 

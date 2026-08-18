@@ -290,8 +290,8 @@ OpenCode 是原生 agent，它的产物（`opencode.json` + 共享技能）随�
 |---|---|---|
 | OpenCode（`opencode`） | 在 `opencode.json` 写入 MCP 条目（`mcp.deepseek-vl`，`type: local`，`npx -y deepseek-vl-support mcp`，`enabled: true`）+ 共享 `.agents/skills/` 技能。按安装范围写项目级或全局级文件；文件做深合并（你的其他键和 MCP 服务器绝不改动），首次修改前备份为 `opencode.json.bak` | OpenCode 原生读取 `.agents/skills/`；重启 OpenCode 后让它描述一张截图 |
 | Trae（`trae`） | 技能复制到 `.trae/skills/deepseek-vision/` + 手动导入指引（Settings → Rules & Skills → Create/Import）+ 可选的手动 MCP 配置（Settings → MCP） | Trae 是 IDE——没有 CLI 自动化；MCP 条目需要手动（Trae 的配置路径未验证） |
-| Pi Coding Agent（`pi`） | 共享 `.agents/skills/` 技能；指引首选原生安装（`pi install npm:deepseek-vl-support`）——一条命令给 pi 用户级技能；**仅当检测到 pi-mcp-adapter 扩展**（存在 `~/.pi/agent/mcp.json` 或 `~/.pi/agent/npm/`）时才写 `mcpServers.deepseek-vl` 到 `~/.pi/agent/mcp.json` | pi 核心没有 MCP——随包技能无需 MCP 即可用；想要 MCP 工具再装适配器（`pi install npm:pi-mcp-adapter`），重启 pi |
-| Oh My Pi（`omp`） | 共享 `.agents/skills/` 技能（omp 以 70 优先级读取）+ 指引 `omp install npm:deepseek-vl-support`——一条命令同时获得技能**和**自动 MCP 工具（自动注册包内 `.mcp.json`）；不写任何配置文件（omp 用户级 MCP 路径未验证） | omp 是带内置 MCP 的 pi fork；`/reload-plugins` 即时生效，无需重启 |
+| Pi Coding Agent（`pi`） | 共享 `.agents/skills/` 技能；指引首选原生安装（`pi install npm:deepseek-vl-support`）——一条命令给 pi 用户级技能和原生扩展（自动图片描述）；**仅当检测到 pi-mcp-adapter 扩展**（存在 `~/.pi/agent/mcp.json` 或 `~/.pi/agent/npm/`）时才写 `mcpServers.deepseek-vl` 到 `~/.pi/agent/mcp.json` | pi 核心没有 MCP——随包技能无需 MCP 即可用；想要 MCP 工具再装适配器（`pi install npm:pi-mcp-adapter`），重启 pi |
+| Oh My Pi（`omp`） | 共享 `.agents/skills/` 技能（omp 以 70 优先级读取）+ 指引 `omp install npm:deepseek-vl-support`——一条命令同时获得技能、自动 MCP 工具**和**原生扩展（自动图片描述；自动注册包内 `.mcp.json`）；不写任何配置文件（omp 用户级 MCP 路径未验证） | omp 是带内置 MCP 的 pi fork；`/reload-plugins` 即时生效，无需重启 |
 | DeepSeek Harness（`dsh`） | 共享 `.agents/skills/` 技能（dsh 以 200 优先级读取 `<project>/.agents/skills`）+ MCP 指引（开发预览版 `@deepseek-ai/dsh-mcp-client` 插件，写 `cordis.patch.yml`） | MCP 是手动的——dsh 没有内置 MCP 支持 |
 
 0.2.3 起新增 5 个 CLI agent 的原生支持（`--target qwen,reasonix,kilo,workbuddy,devin`）。
@@ -326,16 +326,25 @@ pi install npm:deepseek-vl-support          # 已发布包
 pi install git:github.com/limccn/deepseek-vl-support@<tag>   # 从 git 安装（钉版本）
 ```
 
-- 获得什么：用户级的 `deepseek-vision` 技能（pi 只加载其 `pi` 清单列出的资源——
-  `"pi": { "skills": ["./skills"] }`）。技能自包含：内部调用
-  `npx deepseek-vl-support describe`，不依赖任何 MCP 配置即可工作。
+- 获得什么：用户级的 `deepseek-vision` 技能**和原生扩展**（pi 只加载其 `pi`
+  清单列出的资源——`"pi": { "extensions": ["./extensions"],
+  "skills": ["./skills"] }`）。技能自包含：内部调用
+  `npx deepseek-vl-support describe`，不依赖任何 MCP 配置即可工作。扩展提供
+  透明视觉：粘贴/拖拽图片到输入框会自动描述并注入对话；`read` 图片文件返回
+  `[Vision: …]` 文本而不是"模型不支持图片"的提示；`/vision` 显示端点 + 模型
+  状态，启动时自检会在视觉配置缺失时通知你。
+- 扩展把每次描述委托给随包 CLI（`node …/dist/cli.js describe`），与技能、MCP
+  服务器共用同一套端点配置、大小守卫、缓存和 fallback 链——只需配置一次
+  （`deepseek-vl-support config set …` 或 `VISION_*` 环境变量）处处生效。
+  扩展（透明路径）、技能（显式调用）与 MCP 工具并行共存，互不冲突。
 - **不含** MCP 工具——pi 核心没有 MCP。想要 `describe_image` / `vision_status`
   工具就装社区适配器（`pi install npm:pi-mcp-adapter`，重启 pi）后重跑安装器，
   或走向导的 adapter 感知路径。
 - 卸载：`pi remove deepseek-vl-support`（适配器是独立包——用
   `pi remove pi-mcp-adapter` 单独移除）。
-- 注意：装完要重启 pi；项目级技能首次运行需信任项目。若已通过向导装过项目级技能，
-  包技能与其等效，无需重复安装。
+- 注意：装完要重启 pi——扩展模块在启动时加载（每次 `pi update` 后同样需要）；
+  项目级技能首次运行需信任项目。若已通过向导装过项目级技能，包技能与其等效，
+  无需重复安装。
 
 ### Oh My Pi
 
@@ -346,12 +355,16 @@ omp install github:limccn/deepseek-vl-support@<tag>  # 从 git 安装（钉版�
 
 - 获得什么：`deepseek-vision` 技能**和**自动 MCP 工具——omp（内置 MCP 的 pi fork）
   读取包内 `.mcp.json` 并注册 `deepseek-vl` 服务器（`describe_image` /
-  `vision_status`）。`/reload-plugins` 即时生效，无需重启。
+  `vision_status`）——**外加与 pi 相同的原生扩展**（omp 走 `pi` 清单键，所以
+  `pi.extensions` 同样生效）：粘贴图片和 `read` 图片自动描述，`/vision` 与启动
+  自检可用。`/reload-plugins` 即时生效，无需重启。
 - omp 回退读取 `pi` 清单键，所以同一个包两个 agent 都能用；它也读项目
-  `.agents/skills/` 共享目录（优先级 70），向导装的项目技能同样生效。
+  `.agents/skills/` 共享目录（优先级 70），向导装的项目技能同样生效。扩展与
+  技能/MCP 工具共用同一套配置——一次 `deepseek-vl-support config set …` 或
+  `VISION_*` 设置覆盖全部路径。
 - 卸载：`omp plugin uninstall deepseek-vl-support`。
-- 注意：omp 迭代极快——若未来版本不再接受 `pi` 键回退，请反馈；向导路径
-  （共享技能 + 指引）无论如何都继续可用。
+- 注意：omp 迭代极快——若未来版本不再接受 `pi` 键回退（extensions 与 skills
+  都是），请反馈；向导路径（共享技能 + 指引）无论如何都继续可用。
 
 ## Agent Plugins 模式（10 个兼容客户端）
 

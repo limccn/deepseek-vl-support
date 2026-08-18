@@ -1,12 +1,12 @@
 // Vision client tests against a mock HTTP server:
 // success / fallback / chain-all-fail / size guard / empty content / timeout /
-// soft warning / listModels / cache integration.
+// soft warning / listModels / cache integration / describeDataUri.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, listModels, VisionSizeError } from "../src/client.ts";
+import { describe, describeDataUri, listModels, VisionSizeError } from "../src/client.ts";
 import { configPaths, writeConfigFile } from "../src/config.ts";
 import type { FallbackConfig } from "../src/config.ts";
 import { makeFakePng, startMockVisionServer } from "./mock-vision-server.ts";
@@ -234,6 +234,104 @@ test("cache integration: second call hits cache (single API request), file chang
   } finally {
     await mock.close();
   }
+});
+
+// ---------------------------------------------------------------- describeDataUri
+
+function dataUriOf(buf: Buffer, mime = "image/png"): string {
+  return `data:${mime};base64,${buf.toString("base64")}`;
+}
+
+test("describeDataUri: same payload/cache/model behavior as describe, exact data URI reaches the API", async () => {
+  const mock = await startMockVisionServer();
+  try {
+    const { project, home } = await setup({ baseUrl: mock.url });
+    const uri = dataUriOf(makeFakePng());
+
+    const res = await describeDataUri(uri, { cwd: project, home });
+    assert.match(res.text, /mock description/);
+    assert.equal(res.fromFallback, false);
+    assert.equal(res.model, "vision-model");
+
+    const body = mock.requests[0].body as { messages: Array<{ content: Array<{ image_url?: { url: string } }> }> };
+    assert.equal(body.messages[1].content[1].image_url?.url, uri, "the exact data URI reaches the API (no re-encoding)");
+  } finally {
+    await mock.close();
+  }
+});
+
+test("describeDataUri: cache hit on the same data URI (single API request), file path does not collide", async () => {
+  const mock = await startMockVisionServer();
+  try {
+    const { project, home } = await setup({ baseUrl: mock.url });
+    const uri = dataUriOf(makeFakePng());
+
+    const r1 = await describeDataUri(uri, { cwd: project, home });
+    assert.equal(r1.fromCache, undefined);
+    const r2 = await describeDataUri(uri, { cwd: project, home });
+    assert.equal(r2.fromCache, true);
+    assert.equal(r2.text, r1.text);
+    assert.equal(mock.requests.length, 1, "cache hit must not call the API");
+
+    // a file with identical bytes has its own cache identity (path key)
+    const img = join(project, "same.png");
+    await writeFile(img, makeFakePng());
+    const viaFile = await describe(img, { cwd: project, home });
+    assert.equal(viaFile.fromCache, undefined, "file path does not share the inline cache key");
+    assert.equal(mock.requests.length, 2);
+  } finally {
+    await mock.close();
+  }
+});
+
+test("describeDataUri: oversized payload → VisionSizeError before any request", async () => {
+  const mock = await startMockVisionServer();
+  try {
+    const { project, home } = await setup({ baseUrl: mock.url, maxBytes: 100 });
+    await assert.rejects(
+      () => describeDataUri(dataUriOf(makeFakePng(2048)), { cwd: project, home }),
+      (e: unknown) => {
+        assert.ok(e instanceof VisionSizeError);
+        assert.equal((e as VisionSizeError).fileSize, 2048);
+        assert.equal((e as VisionSizeError).maxBytes, 100);
+        return true;
+      },
+    );
+    assert.equal(mock.requests.length, 0, "no request must be sent for oversized payload");
+  } finally {
+    await mock.close();
+  }
+});
+
+test("describeDataUri: fallback chain works identically", async () => {
+  let calls = 0;
+  const mock = await startMockVisionServer({
+    chat: () => {
+      calls++;
+      if (calls === 1) return { status: 500 };
+      return { content: "fallback from data uri" };
+    },
+  });
+  try {
+    const { project, home } = await setup({
+      baseUrl: mock.url,
+      fallbacks: [{ model: "backup-model" }],
+    });
+    const res = await describeDataUri(dataUriOf(makeFakePng()), { cwd: project, home });
+    assert.equal(res.text, "fallback from data uri");
+    assert.equal(res.fromFallback, true);
+    assert.equal(res.model, "backup-model");
+    assert.equal(mock.requests.length, 2);
+  } finally {
+    await mock.close();
+  }
+});
+
+test("describeDataUri: bad data URIs rejected with clear errors", async () => {
+  const { project, home } = await setup();
+  await assert.rejects(() => describeDataUri("not-a-uri", { cwd: project, home }), /invalid data URI/);
+  await assert.rejects(() => describeDataUri("data:text/plain;base64,aGk=", { cwd: project, home }), /not an image data URI/);
+  await assert.rejects(() => describeDataUri("data:image/png;base64,", { cwd: project, home }), /empty image data URI/);
 });
 
 test("listModels: ok / 404→null / unreachable throws", async () => {

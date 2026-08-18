@@ -55,13 +55,15 @@ How to publish a new version of `deepseek-vl-support` to npm.
    ```bash
    npm pack --dry-run
    ```
-   Expected contents (`files` whitelist: `dist/ assets/ skills/ plugin.json
-   mcp.json .mcp.json README.md LICENSE`):
+   Expected contents (`files` whitelist: `dist/ assets/ skills/ extensions/
+   plugin.json mcp.json .mcp.json README.md LICENSE`):
    - `dist/cli.js` (ESM, shebang preserved, bin entry)
    - `dist/hook.cjs` (standalone single-file CJS bundle, zero deps, first-line
      banner carries the identity marker `/*! deepseek-vl-support-hook */`)
    - `assets/` (SKILL.md, vision.md, vision-prompt.md, agents-fragment.md,
      skill-references/)
+   - `extensions/deepseek-vision.ts` (the pi/omp native extension — loaded by
+     jiti at runtime, shipped as TS source, NOT bundled)
    - `skills/deepseek-vision/SKILL.md` (the Agent Plugins skill copy; kept in
      sync with assets/SKILL.md by `npm run build`, committed to git so
      git-based plugin installs ship it)
@@ -77,11 +79,14 @@ How to publish a new version of `deepseek-vl-support` to npm.
    - `marketplace.json` is intentionally NOT packaged: it is only meaningful
      in the git repository, where Copilot's `copilot plugin marketplace add`
      and `copilot plugin install <repo>` read it from the repo root.
-   - **pi/omp native plugin** (since 0.2.4): confirm `"pi": { "skills":
-     ["./skills"] }` and the `pi-package` keyword are in the tarball's
-     package.json, and that `skills/deepseek-vision/SKILL.md` + `mcp.json` +
-     `.mcp.json` are present — pi loads only what its `pi` manifest lists,
-     omp (pi-key fallback) auto-registers the package's `.mcp.json`.
+   - **pi/omp native plugin** (since 0.2.4; extension since 0.2.5): confirm
+     the tarball's package.json carries `"pi": { "extensions":
+     ["./extensions"], "skills": ["./skills"] }` and the `pi-package`
+     keyword, and that `extensions/deepseek-vision.ts` +
+     `skills/deepseek-vision/SKILL.md` + `mcp.json` + `.mcp.json` are
+     present — pi loads only what its `pi` manifest lists; omp (pi-key
+     fallback) loads extensions + skills and auto-registers the package's
+     `.mcp.json`.
    - Must NOT contain: `tests/`, `.trellis/`, `node_modules/`, the source
      `src/` (artifacts already include it), `docs/`, temporary files.
 
@@ -146,13 +151,23 @@ How to publish a new version of `deepseek-vl-support` to npm.
       installs ship Copilot's native MCP file; the test asserts byte-identity
       with mcp.json)
 - [ ] real-endpoint E2E (`e2e-real-endpoint.md`) passes at least once for describe + doctor
-- [ ] pi/omp real-machine e2e (user-owned): `pi install npm:deepseek-vl-support`
-      loads the deepseek-vision skill (restart pi, then `/skill:deepseek-vision`);
-      `pi install git:github.com/limccn/deepseek-vl-support@<tag>` same; `omp
-      install npm:deepseek-vl-support` loads skill + registers the deepseek-vl
-      MCP server (`/reload-plugins`, then call describe_image). Observation
-      items: whether pi requires a restart; behavior of a package skill
-      coexisting with a wizard-installed project skill; and whether the
+- [ ] `describe --data-uri` smoke: in a configured project,
+      `npx <pkg>@<ver> describe --data-uri "data:image/png;base64,<1px png>"`
+      returns a description (same pipeline as the file path)
+- [ ] pi/omp real-machine e2e (user-owned, incl. the 0.2.5 extension):
+      `pi install npm:deepseek-vl-support` loads the deepseek-vision skill AND
+      the native extension (restart pi, then: paste/drag an image into a
+      prompt → description injected automatically; `read` an image file →
+      `[Vision: …]` text; `/vision` shows endpoint + model; the startup
+      self-check notifies when unconfigured); `pi install
+      git:github.com/limccn/deepseek-vl-support@<tag>` same; `omp install
+      npm:deepseek-vl-support` loads skill + extension + registers the
+      deepseek-vl MCP server (`/reload-plugins`, then the same extension
+      checks). Observation items: pi (bun runtime) spawning the `node`
+      subprocess works and output is captured; the real event shapes of
+      `event.images` / `tool_result` image blocks; whether pi requires a
+      restart (the extension module loads at startup); behavior of a package
+      skill coexisting with a wizard-installed project skill; and whether the
       CURRENT omp version still accepts the `pi` key fallback (omp iterates
       fast — re-check before relying on it)
 - [ ] spike findings (plan-A block+additionalContext is visible to the model in

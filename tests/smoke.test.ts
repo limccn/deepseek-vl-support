@@ -105,6 +105,41 @@ test("describe prints the vision text; --json emits structured output", async ()
   }
 });
 
+test("describe --data-uri: inline data works, bad URIs and dual input fail with clear errors, cache holds", async () => {
+  const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
+  try {
+    const { base, project, home } = await makeEnv();
+    projectConfig(project, home, { baseUrl: mock.url, model: "qwen2.5vl:7b" });
+    try {
+      const uri = `data:image/png;base64,${makeFakePng().toString("base64")}`;
+      const ok = await runCli(project, home, ["describe", "--data-uri", uri]);
+      assert.equal(ok.code, 0, `stderr: ${ok.stderr}`);
+      assert.match(ok.stdout, /mock description/);
+      const body = mock.requests[mock.requests.length - 1].body as {
+        messages: Array<{ content: Array<{ image_url?: { url: string } }> }>;
+      };
+      assert.equal(body.messages[1].content[1].image_url?.url, uri, "the exact data URI reaches the API");
+
+      const again = await runCli(project, home, ["describe", "--data-uri", uri]);
+      assert.equal(again.code, 0);
+      const chatCalls = mock.requests.filter((r) => r.path === "/v1/chat/completions").length;
+      assert.equal(chatCalls, 1, "same data URI must hit the cache, not the API");
+
+      const bad = await runCli(project, home, ["describe", "--data-uri", "not-a-uri"]);
+      assert.equal(bad.code, 1);
+      assert.match(bad.stderr, /invalid data URI/);
+
+      const both = await runCli(project, home, ["describe", "--data-uri", uri, "shot.png"]);
+      assert.equal(both.code, 1);
+      assert.match(both.stderr, /either an image file path or --data-uri/);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  } finally {
+    await mock.close();
+  }
+});
+
 test("describe failures: missing file / no args → exit 1 with stderr", async () => {
   const mock = await startMockVisionServer({ models: ["qwen2.5vl:7b"] });
   try {

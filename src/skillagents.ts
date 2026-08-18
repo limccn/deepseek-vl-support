@@ -534,7 +534,7 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
       status: "manual",
       detail:
         notDetected +
-        `Prefer the native package: \`pi install npm:${PKG_NAME}\` (or \`pi install git:github.com/limccn/${PKG_NAME}@<tag>\`) — one command gives pi the deepseek-vision skill (user-level, reload-free after restart). ` +
+        `Prefer the native package: \`pi install npm:${PKG_NAME}\` (or \`pi install git:github.com/limccn/${PKG_NAME}@<tag>\`) — one command gives pi the deepseek-vision skill (user-level, reload-free after restart) and a native extension: pasting an image or reading an image file is described automatically (restart pi after install). ` +
         `The project-level skill was also written to .agents/skills/deepseek-vision/ (pi loads project skills only after you trust the project on first run; use it for team repos). ` +
         `To get MCP tools on top, install the community extension pi-mcp-adapter (\`pi install npm:pi-mcp-adapter\`, restart pi) and re-run this installer.`,
     };
@@ -575,7 +575,9 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
       detail = `added mcpServers["${MCP_SERVER_NAME}"] to ${file}${backup ? ` (backup: ${backup})` : ""}`;
     }
   }
-  const extra = detection.detected ? "" : ` (pi not detected — install it first: ${NOT_DETECTED_HINTS.pi})`;
+  const extra =
+    (detection.detected ? "" : ` (pi not detected — install it first: ${NOT_DETECTED_HINTS.pi})`) +
+    ` The package also ships a native pi extension: pasting an image or reading an image file is described automatically (restart pi after install).`;
   return { agent: "pi", status: "ok", detail: detail + extra };
 }
 

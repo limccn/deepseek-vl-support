@@ -1,6 +1,8 @@
 // OpenAI-compatible vision client.
-// describe(): size guard → base64 data URI → cache → fallback chain with a
-// shared time budget. listModels(): /v1/models probe for doctor/startup checks.
+// describe()/describeDataUri(): size guard → base64 data URI → cache →
+// fallback chain with a shared time budget. listModels(): /v1/models probe
+// for doctor/startup checks.
+import type { Stats } from "node:fs";
 import { open, readFile, stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { DescriptionCache, cacheDirFor } from "./cache.ts";
@@ -121,54 +123,45 @@ async function postChat(
   return text.trim();
 }
 
-/**
- * Describe an image file. Handles: size guard (before base64), soft warning
- * for >2MB files, cache hit, primary attempt, fallback chain with a shared
- * time budget, and cache write keyed on the model that actually answered.
- */
-export async function describe(
-  filePath: string,
-  opts: DescribeOptions = {},
-): Promise<DescribeResult> {
-  const cwd = opts.cwd ?? process.cwd();
-  const home = opts.home;
-  const cfg = resolveConfig(cwd, home);
+/** Cache key path for describeDataUri input (no real file path exists).
+ *  Content identity comes from sha256(buffer)+size+model, so a fixed path
+ *  key is safe: identical payloads hit, different ones never collide. */
+const INLINE_PATH = "data:";
 
+const DATA_URI_RE = /^data:([^;,]+)(;base64)?,([\s\S]*)$/;
+
+function assertVisionReady(cfg: VisionConfig): void {
   if (!cfg.enabled) throw new Error("vision disabled (VISION_DISABLE=1 or enabled:false)");
   if (!cfg.model) {
     throw new Error(`VISION_MODEL is not set (server: ${cfg.baseUrl}) - e.g. export VISION_MODEL=qwen2.5vl:7b`);
   }
+}
 
-  const abs = resolve(cwd, filePath);
-  if (!hasImageExtension(abs)) {
-    throw new Error(`not an image file (png/jpg/jpeg/gif/webp/bmp): ${filePath}`);
-  }
-
-  let st;
-  try {
-    st = await stat(abs);
-  } catch (e) {
-    throw new Error(`cannot read file: ${filePath} (${e instanceof Error ? e.message : e})`);
-  }
-
-  // Size guard BEFORE base64 / any network call
-  if (st.size > cfg.maxBytes) throw new VisionSizeError(st.size, cfg.maxBytes);
+/** The part of describe() shared with describeDataUri: soft warning, cache,
+ *  primary attempt, fallback chain with a shared time budget, cache write
+ *  keyed on the model that actually answered. `pathKey` is the cache
+ *  identity (file path, or INLINE_PATH for inline data); `st` may be a
+ *  pseudo-Stats ({size, mtimeMs: 0}) for inline data — cache.ts only reads
+ *  those two fields. */
+async function runDescribe(
+  pathKey: string,
+  st: Stats,
+  buffer: Buffer,
+  dataUri: string,
+  displayName: string,
+  cfg: VisionConfig,
+  opts: DescribeOptions,
+): Promise<DescribeResult> {
   if (st.size > SOFT_WARN_BYTES) {
     const warn = opts.warn ?? ((m: string) => process.stderr.write(m + "\n"));
     warn(
-      `[deepseek-vl-support] ${basename(abs)} is ${st.size} bytes (>2MB): remote vision API ` +
+      `[deepseek-vl-support] ${displayName} is ${st.size} bytes (>2MB): remote vision API ` +
         `may be slow and costly.`,
     );
   }
 
-  const buffer = await readFile(abs);
-  const head = await readHead(abs, 12);
-  const kind = head ? sniffImageKind(head) : null;
-  const mime = kind ? mimeForKind(kind) : mimeForPath(abs);
-  const dataUri = `data:${mime};base64,${buffer.toString("base64")}`;
-
-  const cache = new DescriptionCache(cacheDirFor(cwd, home));
-  const cached = await cache.get(abs, st, buffer, cfg.model);
+  const cache = new DescriptionCache(cacheDirFor(opts.cwd ?? process.cwd(), opts.home));
+  const cached = await cache.get(pathKey, st, buffer, cfg.model);
   if (cached) {
     return {
       text: cached,
@@ -191,7 +184,7 @@ export async function describe(
   }
 
   const failures: AttemptFailure[] = [];
-  const systemPrompt = resolveSystemPrompt(cwd, home);
+  const systemPrompt = resolveSystemPrompt(opts.cwd ?? process.cwd(), opts.home);
   const question = opts.question?.trim() || "Describe this image very precisely (text, UI, code, visible errors).";
 
   for (let i = 0; i < attempts.length; i++) {
@@ -204,7 +197,7 @@ export async function describe(
     const attemptBudget = Math.min(cfg.timeoutMs, remaining);
     try {
       const text = await postChat(a.baseUrl, a.apiKey, a.model, systemPrompt, question, dataUri, attemptBudget);
-      await cache.set(abs, st, buffer, a.model, text);
+      await cache.set(pathKey, st, buffer, a.model, text);
       return {
         text,
         model: a.model,
@@ -223,6 +216,88 @@ export async function describe(
     `vision failed on all ${failures.length} attempt(s):\n${chain}\n` +
       `Run \`npx deepseek-vl-support doctor\` for diagnosis.`,
   );
+}
+
+/**
+ * Describe an image file. Handles: size guard (before base64), soft warning
+ * for >2MB files, cache hit, primary attempt, fallback chain with a shared
+ * time budget, and cache write keyed on the model that actually answered.
+ */
+export async function describe(
+  filePath: string,
+  opts: DescribeOptions = {},
+): Promise<DescribeResult> {
+  const cwd = opts.cwd ?? process.cwd();
+  const home = opts.home;
+  const cfg = resolveConfig(cwd, home);
+
+  assertVisionReady(cfg);
+
+  const abs = resolve(cwd, filePath);
+  if (!hasImageExtension(abs)) {
+    throw new Error(`not an image file (png/jpg/jpeg/gif/webp/bmp): ${filePath}`);
+  }
+
+  let st;
+  try {
+    st = await stat(abs);
+  } catch (e) {
+    throw new Error(`cannot read file: ${filePath} (${e instanceof Error ? e.message : e})`);
+  }
+
+  // Size guard BEFORE base64 / any network call
+  if (st.size > cfg.maxBytes) throw new VisionSizeError(st.size, cfg.maxBytes);
+
+  const buffer = await readFile(abs);
+  const head = await readHead(abs, 12);
+  const kind = head ? sniffImageKind(head) : null;
+  const mime = kind ? mimeForKind(kind) : mimeForPath(abs);
+  const dataUri = `data:${mime};base64,${buffer.toString("base64")}`;
+
+  return runDescribe(abs, st, buffer, dataUri, basename(abs), cfg, opts);
+}
+
+/**
+ * Describe an image passed inline as a data URI
+ * (data:<mime>;base64,<payload>). Same size guard / cache / fallback chain
+ * as describe(); the cache key is sha256(buffer)+size+model on a fixed
+ * path, so identical payloads hit the cache and different ones never
+ * collide.
+ */
+export async function describeDataUri(
+  dataUri: string,
+  opts: DescribeOptions = {},
+): Promise<DescribeResult> {
+  const cwd = opts.cwd ?? process.cwd();
+  const home = opts.home;
+  const cfg = resolveConfig(cwd, home);
+
+  assertVisionReady(cfg);
+
+  const m = DATA_URI_RE.exec(dataUri);
+  if (!m) {
+    throw new Error("invalid data URI (expected data:<mime>;base64,<payload>)");
+  }
+  const mime = m[1].toLowerCase();
+  if (!mime.startsWith("image/")) {
+    throw new Error(`not an image data URI (mime: ${mime})`);
+  }
+  let buffer: Buffer;
+  try {
+    buffer = m[2]
+      ? Buffer.from(m[3].replace(/\s+/g, ""), "base64")
+      : Buffer.from(decodeURIComponent(m[3]), "utf8");
+  } catch {
+    throw new Error("invalid data URI payload (bad base64 or percent-encoding)");
+  }
+  if (buffer.length === 0) throw new Error("empty image data URI");
+
+  // Size guard BEFORE any network call (the payload is decoded first —
+  // the size is only known after decoding)
+  if (buffer.length > cfg.maxBytes) throw new VisionSizeError(buffer.length, cfg.maxBytes);
+
+  const st = { size: buffer.length, mtimeMs: 0 } as Stats;
+  return runDescribe(INLINE_PATH, st, buffer, dataUri, "inline image", cfg, opts);
 }
 
 /**
