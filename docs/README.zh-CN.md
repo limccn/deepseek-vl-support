@@ -1,3 +1,5 @@
+<img src="banner/banner_zh-CN.png" alt="deepseek-vl-support — 为 DeepSeek 装上「眼睛」" width="100%">
+
 # deepseek-vl-support
 
 > **English** → [README.md](../README.md)

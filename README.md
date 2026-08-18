@@ -1,3 +1,5 @@
+<img src="docs/banner/banner.png" alt="deepseek-vl-support — Give DeepSeek vision capabilities with external vision models" width="100%">
+
 # deepseek-vl-support
 
 > **中文说明** → [docs/README.zh-CN.md](./docs/README.zh-CN.md)
