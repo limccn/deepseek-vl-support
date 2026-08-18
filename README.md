@@ -87,13 +87,13 @@ just press Enter to accept it.**
 
 | # | Question | What it means | Default |
 |---|---|---|---|
-| 1 | Which agents should get vision? | Pick one or more (comma-separated numbers): `claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`. Selected agents that were **not detected** on this machine are flagged during install with an "install it first" hint — non-blocking, the manual guidance still prints | claude, codex + the agents detected on this machine |
+| 1 | Which agents should get vision? | Pick one or more (comma-separated numbers): `claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `qwen`, `reasonix`, `kilo`, `workbuddy`, `devin`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`. Selected agents that were **not detected** on this machine are flagged during install with an "install it first" hint — non-blocking, the manual guidance still prints | claude, codex + the agents detected on this machine |
 | 2 | Vision endpoint preset | Which "eyes provider" to use — pick the one you have an account for (see the endpoint table below), or choose **Decide later** (last option) to skip endpoint configuration for now | openrouter |
 | 3 | Base URL | The address of that service (the preset fills this in) | from preset |
 | 4 | API key | Your secret code for that service; stored only on your computer | Enter skips |
 | 5 | Vision model id | Which "eyes" to use (the preset fills this in) | from preset |
 | 6 | Fallback models | Backup "eyes" if the main one fails (optional) | Enter skips |
-| 7 | Install scope | This project only (recommended), or all your projects. Only asked when a native agent (`claude`, `codex`, `opencode`) is selected | project |
+| 7 | Install scope | This project only (recommended), or all your projects. Only asked when a native agent (`claude`, `codex`, `opencode`, `qwen`, `reasonix`, `kilo`, `workbuddy`, `devin`) is selected | project |
 
 **Decide later**: choosing it (or `--preset later` in non-interactive runs) skips
 the Base URL / API key / model / fallback questions — everything else installs
@@ -289,9 +289,9 @@ npx deepseek-vl-support@latest install --non-interactive --target opencode --pre
 ```
 
 `--target` takes a comma-separated agent list
-(`claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `copilot`, `cursor`,
-`kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`,
-`other`);
+(`claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `qwen`, `reasonix`,
+`kilo`, `workbuddy`, `devin`, `copilot`, `cursor`, `kiro`, `openclaw`,
+`hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`);
 the default is `claude,codex` plus the agents detected on this machine. Any
 combination is allowed — e.g. `--target claude,copilot` installs the Claude
 Code hook AND registers the plugin with Copilot in one run. To skip the
@@ -313,14 +313,29 @@ install-scope question:
 | Pi Coding Agent (`pi`) | shared `.agents/skills/` skill; writes `mcpServers.deepseek-vl` to `~/.pi/agent/mcp.json` **only when the pi-mcp-adapter extension is detected** (file or `~/.pi/agent/npm/` present), otherwise prints install guidance for it | pi core has no MCP — install the adapter (`pi install npm:pi-mcp-adapter`), restart pi, re-run the installer |
 | DeepSeek Harness (`dsh`) | shared `.agents/skills/` skill (dsh reads `<project>/.agents/skills` at rank 200) + MCP guidance for the dev-preview `@deepseek-ai/dsh-mcp-client` plugin (`cordis.patch.yml`) | MCP is manual — dsh has no built-in MCP support |
 
+Five more CLI agents got native support in 0.2.3 (`--target
+qwen,reasonix,kilo,workbuddy,devin`). All are project or global by the install
+scope; every file change is a JSON deep-merge (foreign keys never touched,
+`.bak` backup before the first change) and re-runs are idempotent:
+
+| Agent | What the installer does | Verify / notes |
+|---|---|---|
+| Qwen Code (`qwen`) | skill copied to `.qwen/skills/deepseek-vision/` + `settings.json` `mcpServers.deepseek-vl` (npx) + a `PreToolUse` hook (matcher `Read`) that routes image reads to the MCP server (`node "<abs path to hook.cjs>"`); global scope uses `~/.qwen/` | Qwen does **not** read `.agents/skills/`, so the skill lives in `.qwen/skills/`; a commented (`JSONC`) `settings.json` is reported as manual — file bytes untouched |
+| Reasonix (`reasonix`) | shared `.agents/skills/` skill + project `.mcp.json` `mcpServers` entry + `.reasonix/settings.json` hook; global scope writes a `[[plugins]]` block into `~/.reasonix/config.toml` + `~/.agents/skills/` | The plugin block is wrapped in managed `# deepseek-vl-support:start/end` markers and updated in place; a foreign block without our markers is left untouched (manual) |
+| Kilo Code (`kilo`) | shared `.agents/skills/` skill + `mcp.deepseek-vl` entry in project `.kilo/kilo.json` (`type: local`, command as an **array** `["npx","-y","deepseek-vl-support","mcp"]`, `enabled: true`); global scope probes `~/.config/kilo/kilo.json` then `kilo.jsonc` and writes to whichever exists | Kilo uses the `mcp` key (not `mcpServers`); the config file is created as `kilo.json` when neither exists |
+| WorkBuddy / CodeBuddy Code (`workbuddy`) | skill copied to `.codebuddy/skills/deepseek-vision/` + project `.mcp.json` `mcpServers` entry (`type: stdio`); global scope uses `~/.codebuddy/.mcp.json` | Shares the project `.mcp.json` with Reasonix — either agent's entry is seen as present by the other; a JSONC `.mcp.json` is reported as manual (bytes untouched) |
+| Devin (`devin`) | shared `.agents/skills/` skill + `mcpServers` entry in project `.devin/mcp_config.json`; global scope uses `%APPDATA%\devin` (win32) or `~/.config/devin` (posix) | The Devin CLI has no official npm package — `https://devin.ai/download` |
+
 Selected-but-undetected agents are flagged non-blockingly at install time:
 `⚠ <Label> was not detected on this machine — install it first (<hint>).`
 
 Uninstall ownership: `uninstall --target opencode|pi|dsh` removes each agent's
 own artifacts (the opencode.json / mcp.json entries) but **keeps** the shared
-`.agents/skills/deepseek-vision/` tree — it may be used by other agents. Only
-`uninstall --target codex` removes the shared skill tree (or delete the
-directory yourself).
+`.agents/skills/deepseek-vision/` tree — it may be used by other agents. The
+native CLI agents (qwen/reasonix/kilo/workbuddy/devin) follow the same rule,
+and qwen/workbuddy also remove their own skill copies (`.qwen/skills/`,
+`.codebuddy/skills/`) and hook files. Only `uninstall --target codex` removes
+the shared skill tree (or delete the directory yourself).
 
 ## Agent Plugins mode (10 compatible clients)
 

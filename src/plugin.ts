@@ -59,11 +59,24 @@ export const PLUGIN_CLIENTS: readonly PluginClient[] = [
   "other",
 ];
 
-/** Every agent the installer can target: the three native integrations
- *  (claude/codex/opencode), the three skill-copy consumers (trae/pi/dsh,
- *  registered in src/skillagents.ts), and the ten Agent Plugins plugin
- *  clients. */
-export type Agent = "claude" | "codex" | "opencode" | "trae" | "pi" | "dsh" | PluginClient;
+/** Every agent the installer can target: the native integrations
+ *  (claude/codex/opencode plus the five CLI-agent integrations qwen/reasonix/
+ *  kilo/workbuddy/devin, registered in src/cliagents.ts), the three skill-copy
+ *  consumers (trae/pi/dsh, registered in src/skillagents.ts), and the ten
+ *  Agent Plugins plugin clients. */
+export type Agent =
+  | "claude"
+  | "codex"
+  | "opencode"
+  | "trae"
+  | "pi"
+  | "dsh"
+  | "qwen"
+  | "reasonix"
+  | "kilo"
+  | "workbuddy"
+  | "devin"
+  | PluginClient;
 
 export type AgentKind = "native" | "plugin" | "skill";
 
@@ -76,6 +89,11 @@ export const AGENT_KINDS: Record<Agent, AgentKind> = {
   claude: "native",
   codex: "native",
   opencode: "native",
+  qwen: "native",
+  reasonix: "native",
+  kilo: "native",
+  workbuddy: "native",
+  devin: "native",
   trae: "skill",
   pi: "skill",
   dsh: "skill",
@@ -91,9 +109,23 @@ export const AGENT_KINDS: Record<Agent, AgentKind> = {
   other: "plugin",
 };
 
-// CLI-class agents first (native, then skill-copy), plugin clients after:
-// the wizard groups them in the same order.
-export const AGENTS: readonly Agent[] = ["claude", "codex", "opencode", "trae", "pi", "dsh", ...PLUGIN_CLIENTS];
+// CLI-class agents first (native, then skill-copy), the five new CLI-agent
+// integrations (qwen/reasonix/kilo/workbuddy/devin) in CLI→IDE order after
+// dsh, plugin clients last: the wizard groups them in the same order.
+export const AGENTS: readonly Agent[] = [
+  "claude",
+  "codex",
+  "opencode",
+  "trae",
+  "pi",
+  "dsh",
+  "qwen",
+  "reasonix",
+  "kilo",
+  "workbuddy",
+  "devin",
+  ...PLUGIN_CLIENTS,
+];
 
 export function isPluginAgent(a: Agent): a is PluginClient {
   return AGENT_KINDS[a] === "plugin";
@@ -113,8 +145,11 @@ export const PLUGIN_CLIENT_LABELS: Record<PluginClient, string> = {
 };
 
 /** Pure-name labels for every agent in the wizard menu (R5: no detection
- *  annotations, no explanatory parentheses). Plugin clients reuse their
- *  existing labels (the `other` label is descriptive, not an annotation). */
+ *  annotations, no explanatory parentheses). The "WorkBuddy (CodeBuddy Code)"
+ *  label is a compound name (same precedent as "ChatGPT & Codex"), not an
+ *  annotation: the tool is distributed as both names and the menu must be
+ *  unambiguous. Plugin clients reuse their existing labels (the `other`
+ *  label is descriptive, not an annotation). */
 export const AGENT_LABELS: Record<Agent, string> = {
   claude: "Claude Code",
   codex: "Codex",
@@ -122,6 +157,11 @@ export const AGENT_LABELS: Record<Agent, string> = {
   trae: "Trae",
   pi: "Pi Coding Agent",
   dsh: "DeepSeek Harness",
+  qwen: "Qwen Code",
+  reasonix: "Reasonix",
+  kilo: "Kilo Code",
+  workbuddy: "WorkBuddy (CodeBuddy Code)",
+  devin: "Devin",
   ...PLUGIN_CLIENT_LABELS,
 };
 

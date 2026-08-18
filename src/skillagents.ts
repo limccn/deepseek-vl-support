@@ -197,7 +197,7 @@ function writeManagedFile(
 /** Write the packaged deepseek-vision skill tree (SKILL.md +
  *  references/vision-prompt.md, both SKILL_MARKER-marked) into `destDir`.
  *  Returns false when the packaged SKILL.md source is missing. */
-function writeSkillTree(
+export function writeSkillTree(
   destDir: string,
   opts: { update?: boolean; dryRun?: boolean },
   log: (msg: string) => void,
@@ -274,7 +274,7 @@ function removeManagedSkillFile(target: string, opts: { dryRun?: boolean }, note
 /** Remove the managed files of a skill tree and then the empty dirs that
  *  remain (deepest first; any user-authored leftover keeps the tree).
  *  Mirrors install.ts's removeEmptyDirTree. */
-function removeSkillTree(dir: string, opts: { dryRun?: boolean }, notes: string[]): void {
+export function removeSkillTree(dir: string, opts: { dryRun?: boolean }, notes: string[]): void {
   let removed = 0;
   removed += removeManagedSkillFile(join(dir, "references", "vision-prompt.md"), opts, notes);
   removed += removeManagedSkillFile(join(dir, "SKILL.md"), opts, notes);
@@ -332,7 +332,7 @@ function readdirSyncSafe(dir: string): string[] {
 /** Read a JSON config file as an object. Returns { data } on success, null
  *  when the file is missing, or a { manual } reason string when it exists but
  *  cannot be modified safely (not valid JSON / not an object). */
-function readJsonConfig(
+export function readJsonConfig(
   file: string,
 ): { data: Record<string, unknown> } | { missing: true } | { manual: string } {
   const raw = readTextFile(file);
@@ -353,7 +353,7 @@ function readJsonConfig(
 /** Merge an entry into data[key][MCP_SERVER_NAME]. Returns "added" /
  *  "present" / "invalid" — invalid when data[key] exists with a non-object
  *  type (a user-authored schema violation we never clobber). */
-function jsonEntryAdded(
+export function jsonEntryAdded(
   data: Record<string, unknown>,
   key: string,
   entry: Record<string, unknown>,
@@ -371,7 +371,7 @@ function jsonEntryAdded(
 
 /** Remove our entry from data[key][MCP_SERVER_NAME] (and the empty `key`
  *  container once nothing is left). Returns how many entries were removed. */
-function jsonEntryRemoved(data: Record<string, unknown>, key: string): number {
+export function jsonEntryRemoved(data: Record<string, unknown>, key: string): number {
   const existing = data[key];
   if (typeof existing !== "object" || existing === null || Array.isArray(existing)) return 0;
   const map = existing as Record<string, unknown>;

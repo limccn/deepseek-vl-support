@@ -126,8 +126,9 @@ Windows Server 2022；node v24.14.1、npm 11.11.0、python 3.12.9、git 2.53.0 �
     LM Studio，外加 "Decide later"：选中则跳过 baseUrl/key/模型/备用模型四步并警告
     不配置模型将无法使用视觉功能，附 `config set` 补配指引）→ baseUrl（预设默认）→
     API key（可跳过）→ 模型 id（预设示例）→ 备用模型（可跳过）→ 作用域（项目标注推荐、
-    置首、默认；仅当选中 native agent（claude/codex/opencode）时询问——skill/plugin
-    agent 不触发）→ 写配置 → 安装文件 → 深合并配置 → 自动 doctor → 下一步提示。
+    置首、默认；仅当选中 native agent（claude/codex/opencode/qwen/reasonix/kilo/
+    workbuddy/devin）时询问——skill/plugin agent 不触发）→ 写配置 → 安装文件 →
+    深合并配置 → 自动 doctor → 下一步提示。
   - 幂等（重复执行不重复追加）；`--update` 覆盖升级；**`uninstall` 一键卸载**：按标记移除
     全部注入产物（hooks 条目、hook 脚本、skill、command、MCP 段、AGENTS.md 段、.gitignore 行），
     用户原配置无损，config.json 与缓存默认保留（`--purge-config` 才删除）；

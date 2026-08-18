@@ -23,6 +23,8 @@ import {
   scopeMenuSpec,
 } from "../src/install.ts";
 import { AGENT_LABELS, AGENTS, detectPluginClients, PLUGIN_CLIENTS } from "../src/plugin.ts";
+import { CLI_AGENTS, detectCliAgents } from "../src/cliagents.ts";
+import type { CliAgent } from "../src/cliagents.ts";
 import { detectSkillModuleAgents, opencodeConfigFile, SKILL_MODULE_AGENTS, traeConfigDir } from "../src/skillagents.ts";
 import {
   AGENTS_END_MARKER,
@@ -553,15 +555,16 @@ test("parseTargets: comma list, dedupe, case-insensitive, default; rejects both/
   assert.throws(() => parseTargets("plugin"), /invalid target: "plugin"/);
   assert.deepEqual(parseTargets("opencode,trae,pi,dsh"), ["opencode", "trae", "pi", "dsh"]);
   assert.deepEqual(parseTargets("Trae,PI,Dsh"), ["trae", "pi", "dsh"]);
+  assert.deepEqual(parseTargets("qwen,reasonix,kilo,workbuddy,devin"), ["qwen", "reasonix", "kilo", "workbuddy", "devin"]);
   assert.throws(
     () => parseTargets("bogus"),
-    /expected one of: claude,codex,opencode,trae,pi,dsh,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/,
+    /expected one of: claude,codex,opencode,trae,pi,dsh,qwen,reasonix,kilo,workbuddy,devin,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/,
   );
   assert.throws(() => parseTargets("claude,bogus"), /invalid target: "bogus"/);
   assert.throws(() => parseTargets(","), /invalid target: ""/);
 });
 
-test("agentMenuSpec: one flat 16-option multi-select, pure-name labels, detected defaults", async () => {
+test("agentMenuSpec: one flat 21-option multi-select, pure-name labels, detected defaults", async () => {
   const { base, project, home } = await makeEnv();
   try {
     // hermetic environment: no real CLIs from the host machine; a simulated
@@ -570,7 +573,7 @@ test("agentMenuSpec: one flat 16-option multi-select, pure-name labels, detected
     const env = { PATH: "" };
     const spec = agentMenuSpec(home, env);
     assert.deepEqual(spec.options.map((o) => o.value), AGENTS);
-    assert.equal(spec.options.length, 16);
+    assert.equal(spec.options.length, 21);
     assert.ok(spec.options.every((o) => o.value !== "both" && o.value !== "plugin"), "menu must not offer both/plugin");
     // R5: labels are the pure AGENT_LABELS names — no annotation parens
     for (const o of spec.options) {
@@ -581,30 +584,38 @@ test("agentMenuSpec: one flat 16-option multi-select, pure-name labels, detected
       assert.ok(!o.label.includes("(default)"), `no default marker: ${o.label}`);
     }
     // defaults: claude + codex plus every agent detected (plugin clients +
-    // the skill-module agents), computed exactly like the spec does
+    // the skill-module agents + the five CLI agents), computed exactly like
+    // the spec does
     const detected = detectPluginClients(home, env);
     const skillDetected = detectSkillModuleAgents(home, env);
+    const cliDetected = detectCliAgents(home, env);
     assert.deepEqual(spec.default, [
       "claude",
       "codex",
       ...PLUGIN_CLIENTS.filter((c) => detected[c].detected),
       ...SKILL_MODULE_AGENTS.filter((a) => skillDetected[a].detected),
+      ...CLI_AGENTS.filter((a) => cliDetected[a].detected),
     ]);
     assert.ok(spec.default.includes("trae"), "detected trae (config dir) is a default");
     assert.ok(!spec.default.includes("opencode"), "undetected opencode is not a default");
     assert.ok(!spec.default.includes("pi"), "undetected pi is not a default");
     assert.ok(!spec.default.includes("dsh"), "undetected dsh is not a default");
+    assert.ok(!spec.default.some((a) => CLI_AGENTS.includes(a as CliAgent)), "undetected cli agents are not defaults");
   } finally {
     await rm(base, { recursive: true, force: true });
   }
 });
 
-test("needsScopeQuestion: only native agents (claude/codex/opencode) trigger the scope question", () => {
+test("needsScopeQuestion: only native agents (claude/codex/opencode + the five CLI agents) trigger the scope question", () => {
   assert.equal(needsScopeQuestion(["claude"]), true);
   assert.equal(needsScopeQuestion(["codex"]), true);
   assert.equal(needsScopeQuestion(["opencode"]), true);
   assert.equal(needsScopeQuestion(["claude", "copilot"]), true);
   assert.equal(needsScopeQuestion(["pi", "trae", "dsh", "opencode"]), true);
+  for (const a of CLI_AGENTS) {
+    assert.equal(needsScopeQuestion([a]), true, `${a} is a native agent — scope question asked`);
+  }
+  assert.equal(needsScopeQuestion(["qwen", "copilot"]), true);
   assert.equal(needsScopeQuestion(["pi"]), false, "skill agents are project-level only");
   assert.equal(needsScopeQuestion(["trae", "dsh"]), false);
   assert.equal(needsScopeQuestion(["copilot", "kiro"]), false, "plugin agents are always global");

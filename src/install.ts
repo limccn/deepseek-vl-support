@@ -1,12 +1,15 @@
 // Installer: numbered-menu wizard (interactive) or flags/env (CI). A single
-// flat agent list of 16 targets — claude, codex, opencode (native installs:
+// flat agent list of 21 targets — claude, codex, opencode (native installs:
 // Claude Code
 // hook + skill + slash command + settings.json deep-merge; Codex config.toml
 // MCP section + AGENTS.md block + models.json fix + project-scope
-// .agents/skills/ write) and copilot, cursor, kiro, openclaw, hermes, vscode,
-// chatgpt-codex, grok, nanoclaw, other (Agent Plugins mode: materialize the
-// plugin dir + per-client registration). Idempotent re-install and
-// marker-based uninstall; --target takes a comma-separated agent list.
+// .agents/skills/ write), qwen, reasonix, kilo, workbuddy, devin (native
+// CLI-agent installs, see src/cliagents.ts), trae, pi, dsh (skill-copy
+// installs, see src/skillagents.ts) and copilot, cursor, kiro, openclaw,
+// hermes, vscode, chatgpt-codex, grok, nanoclaw, other (Agent Plugins mode:
+// materialize the plugin dir + per-client registration). Idempotent
+// re-install and marker-based uninstall; --target takes a comma-separated
+// agent list.
 //
 // Safety rules:
 //  - settings.json / config.toml / AGENTS.md are backed up to `<file>.bak`
@@ -37,7 +40,6 @@ import {
   COMMAND_MARKER,
   CONFIG_DIR,
   GITIGNORE_ENTRY,
-  HOOK_COMMAND_IDENT,
   HOOK_FILENAME,
   HOOK_MARKER,
   MCP_SERVER_NAME,
@@ -46,6 +48,8 @@ import {
   SKILL_MARKER,
 } from "./identity.ts";
 import { packageRoot, packagedHookPath, templatePath } from "./paths.ts";
+import { hasOurHookEntry, hookEntriesAdded, hookEntriesRemoved } from "./hooksettings.ts";
+import type { SettingsFile } from "./hooksettings.ts";
 import {
   AGENT_KINDS,
   AGENT_LABELS,
@@ -69,6 +73,14 @@ import {
   writeSharedAgentsSkill,
 } from "./skillagents.ts";
 import type { SkillModuleAgent } from "./skillagents.ts";
+import {
+  CLI_AGENTS,
+  CLI_NOT_DETECTED_HINTS,
+  detectCliAgents,
+  installCliAgents,
+  uninstallCliAgents,
+} from "./cliagents.ts";
+import type { CliAgent } from "./cliagents.ts";
 import { askInput, askMenu, askMultiMenu, askSecret } from "./wizard.ts";
 import type { MenuSpec, MultiMenuSpec } from "./wizard.ts";
 
@@ -115,6 +127,7 @@ export function parseTargets(raw: string | undefined): Agent[] {
 export function agentMenuSpec(home: string, env: NodeJS.ProcessEnv = process.env): MultiMenuSpec {
   const detected = detectPluginClients(home, env);
   const skillDetected = detectSkillModuleAgents(home, env);
+  const cliDetected = detectCliAgents(home, env);
   return {
     prompt: "Which agents should get vision?",
     options: AGENTS.map((a) => ({ value: a, label: AGENT_LABELS[a] })),
@@ -123,14 +136,15 @@ export function agentMenuSpec(home: string, env: NodeJS.ProcessEnv = process.env
       "codex",
       ...PLUGIN_CLIENTS.filter((c) => detected[c].detected),
       ...SKILL_MODULE_AGENTS.filter((a) => skillDetected[a].detected),
+      ...CLI_AGENTS.filter((a) => cliDetected[a].detected),
     ],
   };
 }
 
 /** True when the wizard asks the install-scope question: any native agent
- *  (claude/codex/opencode) is selected. Skill agents (trae/pi/dsh) are
- *  project-level only and plugin clients are always global. Exported for
- *  tests. */
+ *  (claude/codex/opencode plus the CLI agents qwen/reasonix/kilo/workbuddy/
+ *  devin) is selected. Skill agents (trae/pi/dsh) are project-level only and
+ *  plugin clients are always global. Exported for tests. */
 export function needsScopeQuestion(targets: Agent[]): boolean {
   return targets.some((a) => AGENT_KINDS[a] === "native");
 }
@@ -392,11 +406,6 @@ function writeManagedFile(
 
 // ---------------------------------------------------------------- settings.json
 
-interface SettingsFile {
-  file: string;
-  data: Record<string, unknown>;
-}
-
 function readSettings(file: string): SettingsFile | null {
   const raw = readTextFile(file);
   if (raw === null) return null;
@@ -407,54 +416,6 @@ function readSettings(file: string): SettingsFile | null {
   } catch {
     throw new Error(`settings.json is not valid JSON; refusing to modify: ${file}`);
   }
-}
-
-/** True when the given hooks array already contains one of OUR entries. */
-function hasOurHookEntry(entries: unknown[]): boolean {
-  return entries.some((e) =>
-    Array.isArray((e as { hooks?: unknown[] })?.hooks) &&
-    (e as { hooks: unknown[] }).hooks.some(
-      (h) => typeof (h as { command?: unknown })?.command === "string" &&
-        ((h as { command: string }).command as string).includes(HOOK_COMMAND_IDENT),
-    ),
-  );
-}
-
-function hookEntriesAdded(settings: SettingsFile, event: string, command: string, startCommand: string): boolean {
-  const hooks = (settings.data.hooks as Record<string, unknown[]> | undefined) ?? {};
-  const arr = (hooks[event] as unknown[] | undefined) ?? [];
-  if (hasOurHookEntry(arr)) return false;
-  arr.push(
-    event === "PreToolUse"
-      ? { matcher: "Read", hooks: [{ type: "command", command, timeout: 60 }] }
-      : { hooks: [{ type: "command", command: startCommand, timeout: 30 }] },
-  );
-  hooks[event] = arr;
-  settings.data.hooks = hooks;
-  return true;
-}
-
-function hookEntriesRemoved(settings: SettingsFile): number {
-  const hooks = settings.data.hooks as Record<string, unknown[] | undefined> | undefined;
-  if (!hooks) return 0;
-  let removed = 0;
-  for (const event of Object.keys(hooks)) {
-    const arr = (hooks[event] as unknown[] | undefined) ?? [];
-    const kept = arr.filter((e) => {
-      const cmds = ((e as { hooks?: unknown[] })?.hooks ?? []) as unknown[];
-      const isOurs = cmds.some(
-        (h) => typeof (h as { command?: unknown })?.command === "string" &&
-          ((h as { command: string }).command as string).includes(HOOK_COMMAND_IDENT),
-      );
-      if (isOurs) removed++;
-      return !isOurs;
-    });
-    if (kept.length) hooks[event] = kept;
-    else delete hooks[event];
-  }
-  if (removed === 0) return 0;
-  if (Object.keys(hooks).length === 0) delete settings.data.hooks;
-  return removed;
 }
 
 // ---------------------------------------------------------------- .gitignore
@@ -651,6 +612,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
   const home = opts.home ?? homedir();
   const pluginDetection = detectPluginClients(home, env);
   const skillDetection = detectSkillModuleAgents(home, env);
+  const cliDetection = detectCliAgents(home, env);
   const hasPlugin = answers.targets.some(isPluginAgent);
   // Plugin agents are always global: their MCP subprocesses resolve config as
   // env > global > defaults and cannot see project configs. Mixed runs
@@ -673,9 +635,11 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
     if (clientHasDetector(c)) detectedById.set(c, pluginDetection[c].detected);
   }
   for (const a of SKILL_MODULE_AGENTS) detectedById.set(a, skillDetection[a].detected);
+  for (const a of CLI_AGENTS) detectedById.set(a, cliDetection[a].detected);
   for (const a of answers.targets) {
     if (detectedById.get(a) === false) {
-      const hint = (NOT_DETECTED_HINTS as Record<string, string | undefined>)[a];
+      const hint = (NOT_DETECTED_HINTS as Record<string, string | undefined>)[a]
+        ?? (CLI_NOT_DETECTED_HINTS as Record<string, string | undefined>)[a];
       log(`⚠ ${AGENT_LABELS[a]} was not detected on this machine — install it first${hint ? ` (${hint})` : ""}.`);
     }
   }
@@ -741,6 +705,24 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
           warnings: report.warnings,
         },
         skillDetection,
+      )),
+    );
+  }
+  const cliTargets = answers.targets.filter((a): a is CliAgent => (CLI_AGENTS as readonly string[]).includes(a));
+  if (cliTargets.length > 0) {
+    agents.push(
+      ...(await installCliAgents(
+        {
+          cwd: opts.cwd,
+          home,
+          global: answers.global,
+          update: opts.update,
+          dryRun: opts.dryRun,
+          agents: cliTargets,
+          log,
+          warnings: report.warnings,
+        },
+        cliDetection,
       )),
     );
   }
@@ -1032,6 +1014,15 @@ export async function runUninstall(opts: UninstallOptions): Promise<UninstallRep
       ...(await uninstallSkillAgents(
         { cwd: opts.cwd, home, global: opts.global, dryRun: opts.dryRun, agents: skillTargets },
         detectSkillModuleAgents(home),
+      )),
+    );
+  }
+  const cliTargets = targets.filter((a): a is CliAgent => (CLI_AGENTS as readonly string[]).includes(a));
+  if (cliTargets.length > 0) {
+    agents.push(
+      ...(await uninstallCliAgents(
+        { cwd: opts.cwd, home, global: opts.global, dryRun: opts.dryRun, agents: cliTargets },
+        detectCliAgents(home),
       )),
     );
   }

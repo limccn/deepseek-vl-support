@@ -75,13 +75,13 @@ Trae、Pi、DeepSeek Harness 不支持该标准，必须走上面的 npx 向导�
 
 | # | 问题 | 什么意思 | 默认值 |
 |---|---|---|---|
-| 1 | 哪些 agent 要装视觉？ | 多选（逗号分隔的数字）：`claude`、`codex`、`opencode`、`trae`、`pi`、`dsh`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、`other`。选中的 agent 在本机**未检测到**时，安装过程中会打印"install it first"提示——不阻塞，手动指引照常输出 | claude, codex + 本机检测到的 agent |
+| 1 | 哪些 agent 要装视觉？ | 多选（逗号分隔的数字）：`claude`、`codex`、`opencode`、`trae`、`pi`、`dsh`、`qwen`、`reasonix`、`kilo`、`workbuddy`、`devin`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、`other`。选中的 agent 在本机**未检测到**时，安装过程中会打印"install it first"提示——不阻塞，手动指引照常输出 | claude, codex + 本机检测到的 agent |
 | 2 | 视觉端点预设 | 用哪家"看图服务"——选你注册了账号的那家（见下方端点表），或选最后一项 **Decide later**（稍后决定）跳过端点配置 | openrouter |
 | 3 | 端点地址（Base URL） | 那家服务的地址（预设已帮你填好） | 来自预设 |
 | 4 | API key | 那家服务的密钥；只存在你自己的电脑上 | 回车跳过 |
 | 5 | 视觉模型 id | 用哪双"眼睛"（预设已帮你填好） | 来自预设 |
 | 6 | 兜底模型 | 主服务失灵时的备用"眼睛"（可不填） | 回车跳过 |
-| 7 | 安装范围 | 只装这个项目（推荐），还是所有项目。只有选中了原生 agent（`claude`、`codex`、`opencode`）时才会问 | project |
+| 7 | 安装范围 | 只装这个项目（推荐），还是所有项目。只有选中了原生 agent（`claude`、`codex`、`opencode`、`qwen`、`reasonix`、`kilo`、`workbuddy`、`devin`）时才会问 | project |
 
 **Decide later（稍后决定）**：选择它（或非交互安装时用 `--preset later`）会跳过
 端点地址 / API key / 模型 / 兜底模型这些问题——其余照常安装，但安装器会打印：
@@ -272,8 +272,9 @@ npx deepseek-vl-support@latest install --non-interactive --target opencode --pre
 ```
 
 `--target` 接受逗号分隔的 agent 列表（`claude`、`codex`、`opencode`、`trae`、
-`pi`、`dsh`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、
-`chatgpt-codex`、`grok`、`nanoclaw`、`other`），默认 `claude,codex` + 本机检测到的
+`pi`、`dsh`、`qwen`、`reasonix`、`kilo`、`workbuddy`、`devin`、`copilot`、
+`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、
+`nanoclaw`、`other`），默认 `claude,codex` + 本机检测到的
 agent。任意组合都支持——例如 `--target claude,copilot` 一次运行同时装好 Claude
 Code 钩子并注册 Copilot 插件。要跳过端点配置，传 `--preset later`。
 
@@ -292,12 +293,26 @@ OpenCode 是原生 agent，它的产物（`opencode.json` + 共享技能）随�
 | Pi Coding Agent（`pi`） | 共享 `.agents/skills/` 技能；**仅当检测到 pi-mcp-adapter 扩展**（存在 `~/.pi/agent/mcp.json` 或 `~/.pi/agent/npm/`）时才写 `mcpServers.deepseek-vl` 到 `~/.pi/agent/mcp.json`，否则打印安装该扩展的指引 | pi 核心没有 MCP——先装适配器（`pi install npm:pi-mcp-adapter`），重启 pi，再重跑安装器 |
 | DeepSeek Harness（`dsh`） | 共享 `.agents/skills/` 技能（dsh 以 200 优先级读取 `<project>/.agents/skills`）+ MCP 指引（开发预览版 `@deepseek-ai/dsh-mcp-client` 插件，写 `cordis.patch.yml`） | MCP 是手动的——dsh 没有内置 MCP 支持 |
 
+0.2.3 起新增 5 个 CLI agent 的原生支持（`--target qwen,reasonix,kilo,workbuddy,devin`）。
+全部按安装范围支持项目级/全局级；每次文件修改都是 JSON 深合并（绝不改动外来键，
+首次修改前备份 `.bak`），重复安装幂等：
+
+| Agent | 安装器做什么 | 验证 / 说明 |
+|---|---|---|
+| Qwen Code（`qwen`） | 技能复制到 `.qwen/skills/deepseek-vision/` + `settings.json` 写 `mcpServers.deepseek-vl`（npx）+ `PreToolUse` 钩子（matcher `Read`），把图片读取路由到 MCP 服务器（`node "<hook.cjs 绝对路径>"`）；全局级用 `~/.qwen/` | Qwen **不读** `.agents/skills/`，所以技能放在 `.qwen/skills/`；带注释（JSONC）的 `settings.json` 报告为 manual——文件字节不动 |
+| Reasonix（`reasonix`） | 共享 `.agents/skills/` 技能 + 项目 `.mcp.json` 的 `mcpServers` 条目 + `.reasonix/settings.json` 钩子；全局级在 `~/.reasonix/config.toml` 写 `[[plugins]]` 块 + `~/.agents/skills/` | 插件块用 `# deepseek-vl-support:start/end` 托管标记包裹，原位更新；不带我们标记的外部块原样保留（manual） |
+| Kilo Code（`kilo`） | 共享 `.agents/skills/` 技能 + 项目 `.kilo/kilo.json` 写 `mcp.deepseek-vl`（`type: local`，命令为**数组** `["npx","-y","deepseek-vl-support","mcp"]`，`enabled: true`）；全局级探测 `~/.config/kilo/kilo.json` 再 `kilo.jsonc`，写入已存在者 | Kilo 用的是 `mcp` 键（不是 `mcpServers`）；两者都不存在时创建 `kilo.json` |
+| WorkBuddy / CodeBuddy Code（`workbuddy`） | 技能复制到 `.codebuddy/skills/deepseek-vision/` + 项目 `.mcp.json` 的 `mcpServers` 条目（`type: stdio`）；全局级用 `~/.codebuddy/.mcp.json` | 与 Reasonix 共享项目 `.mcp.json`——任一方的条目另一方视为已存在；JSONC 的 `.mcp.json` 报告为 manual（字节不动） |
+| Devin（`devin`） | 共享 `.agents/skills/` 技能 + 项目 `.devin/mcp_config.json` 写 `mcpServers` 条目；全局级用 `%APPDATA%\devin`（win32）或 `~/.config/devin`（posix） | Devin CLI 没有官方 npm 包——`https://devin.ai/download` |
+
 选中的 agent 在本机未检测到时，安装时非阻塞地提示：
 `⚠ <Label> was not detected on this machine — install it first (<hint>).`
 
 卸载归属：`uninstall --target opencode|pi|dsh` 只移除各自专属的文件（opencode.json /
 mcp.json 中的条目），**保留**共享的 `.agents/skills/deepseek-vision/` 目录——其他
-agent 可能还在用。只有 `uninstall --target codex` 会删除共享技能目录（或手动删目录）。
+agent 可能还在用。新增的 CLI agent（qwen/reasonix/kilo/workbuddy/devin）遵循同样规则，
+qwen/workbuddy 还会移除自己的技能副本（`.qwen/skills/`、`.codebuddy/skills/`）和钩子文件。
+只有 `uninstall --target codex` 会删除共享技能目录（或手动删目录）。
 
 ## Agent Plugins 模式（10 个兼容客户端）
 

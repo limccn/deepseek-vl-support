@@ -20,7 +20,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.2.2";
+const VERSION = "0.2.3";
 
 interface ParsedArgs {
   flags: Map<string, string>;
@@ -111,6 +111,16 @@ detected on this machine):
                 otherwise guidance (project scope)
   dsh           DeepSeek Harness: shared .agents/skills/ skill + MCP guidance
                 (project scope)
+  qwen          Qwen Code: skill in .qwen/skills/ + settings.json MCP + Read
+                hook (project or global)
+  reasonix      Reasonix: shared .agents/skills/ skill + .mcp.json MCP + hook;
+                global uses config.toml [[plugins]] (project or global)
+  kilo          Kilo Code: shared .agents/skills/ skill + kilo.json MCP entry
+                (project or global)
+  workbuddy     WorkBuddy (CodeBuddy Code): skill in .codebuddy/skills/ +
+                .mcp.json MCP (project or global)
+  devin         Devin: shared .agents/skills/ skill + mcp_config.json MCP
+                (project or global)
   copilot       GitHub Copilot via Agent Plugins (always global)
   cursor        Cursor via Agent Plugins (always global)
   kiro          Kiro via Agent Plugins (always global)
