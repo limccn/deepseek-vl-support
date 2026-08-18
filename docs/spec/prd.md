@@ -116,9 +116,10 @@ Windows Server 2022；node v24.14.1、npm 11.11.0、python 3.12.9、git 2.53.0 �
   - 局限写入文档：Codex 无自动拦截，粘贴图片会丢失，需保存文件后由 Agent 调用工具。
 - **R4 一键安装**（D1/D3）：
   - `npx deepseek-vl-support@latest install`：**简单编号菜单式向导**（每步列出选项按数字选择、
-    带默认值回车即可跳过：第一步为**单个多选列表**（claude / codex / opencode / trae / pi /
-    dsh / copilot / cursor / kiro / openclaw / hermes / vscode / chatgpt-codex / grok /
-    nanoclaw / other 共 16 项，标签为纯名称（无检测/机制标注），选中未检测到的 agent 时
+    带默认值回车即可跳过：第一步为**单个多选列表**（claude / codex / opencode / trae /
+    pi / omp / dsh / qwen / reasonix / kilo / workbuddy / devin / copilot / cursor / kiro /
+    openclaw / hermes / vscode / chatgpt-codex / grok /
+    nanoclaw / other 共 22 项，标签为纯名称（无检测/机制标注），选中未检测到的 agent 时
     安装阶段输出"not detected — install it first"提示；`other` 为通用「Other agents that
     support the Agent Plugins open standard」选项；取代旧的 claude/codex/both 单选与单独
     插件客户端步骤）→ 端点预设（13 项：OpenRouter / Moonshot / MiniMax / Zhipu GLM /

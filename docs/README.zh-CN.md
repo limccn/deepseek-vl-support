@@ -75,7 +75,7 @@ Trae、Pi、DeepSeek Harness 不支持该标准，必须走上面的 npx 向导�
 
 | # | 问题 | 什么意思 | 默认值 |
 |---|---|---|---|
-| 1 | 哪些 agent 要装视觉？ | 多选（逗号分隔的数字）：`claude`、`codex`、`opencode`、`trae`、`pi`、`dsh`、`qwen`、`reasonix`、`kilo`、`workbuddy`、`devin`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、`other`。选中的 agent 在本机**未检测到**时，安装过程中会打印"install it first"提示——不阻塞，手动指引照常输出 | claude, codex + 本机检测到的 agent |
+| 1 | 哪些 agent 要装视觉？ | 多选（逗号分隔的数字）：`claude`、`codex`、`opencode`、`trae`、`pi`、`omp`、`dsh`、`qwen`、`reasonix`、`kilo`、`workbuddy`、`devin`、`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、`nanoclaw`、`other`。选中的 agent 在本机**未检测到**时，安装过程中会打印"install it first"提示——不阻塞，手动指引照常输出 | claude, codex + 本机检测到的 agent |
 | 2 | 视觉端点预设 | 用哪家"看图服务"——选你注册了账号的那家（见下方端点表），或选最后一项 **Decide later**（稍后决定）跳过端点配置 | openrouter |
 | 3 | 端点地址（Base URL） | 那家服务的地址（预设已帮你填好） | 来自预设 |
 | 4 | API key | 那家服务的密钥；只存在你自己的电脑上 | 回车跳过 |
@@ -272,25 +272,26 @@ npx deepseek-vl-support@latest install --non-interactive --target opencode --pre
 ```
 
 `--target` 接受逗号分隔的 agent 列表（`claude`、`codex`、`opencode`、`trae`、
-`pi`、`dsh`、`qwen`、`reasonix`、`kilo`、`workbuddy`、`devin`、`copilot`、
-`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、`grok`、
-`nanoclaw`、`other`），默认 `claude,codex` + 本机检测到的
+`pi`、`omp`、`dsh`、`qwen`、`reasonix`、`kilo`、`workbuddy`、`devin`、
+`copilot`、`cursor`、`kiro`、`openclaw`、`hermes`、`vscode`、`chatgpt-codex`、
+`grok`、`nanoclaw`、`other`），默认 `claude,codex` + 本机检测到的
 agent。任意组合都支持——例如 `--target claude,copilot` 一次运行同时装好 Claude
 Code 钩子并注册 Copilot 插件。要跳过端点配置，传 `--preset later`。
 
-## 技能型 agent（OpenCode / Trae / Pi / DeepSeek Harness）
+## 技能型 agent（OpenCode / Trae / Pi / Oh My Pi / DeepSeek Harness）
 
-这四个 agent 读取 [Agent Skills](https://agent-skills.org) 技能，但没有实现
-Agent Plugins 开放标准，因此有各自的集成方式（`--target opencode,trae,pi,dsh`）。
+这五个 agent 读取 [Agent Skills](https://agent-skills.org) 技能，但没有实现
+Agent Plugins 开放标准，因此有各自的集成方式（`--target opencode,trae,pi,omp,dsh`）。
 OpenCode 是原生 agent，它的产物（`opencode.json` + 共享技能）随你选择的安装范围
-（项目/全局）而定。技能复制型 agent（trae/pi/dsh）**只支持项目级安装**，永远
+（项目/全局）而定。技能 agent（trae/pi/omp/dsh）**只支持项目级安装**，永远
 不会触发安装范围问题：
 
 | Agent | 安装器做什么 | 验证 / 说明 |
 |---|---|---|
 | OpenCode（`opencode`） | 在 `opencode.json` 写入 MCP 条目（`mcp.deepseek-vl`，`type: local`，`npx -y deepseek-vl-support mcp`，`enabled: true`）+ 共享 `.agents/skills/` 技能。按安装范围写项目级或全局级文件；文件做深合并（你的其他键和 MCP 服务器绝不改动），首次修改前备份为 `opencode.json.bak` | OpenCode 原生读取 `.agents/skills/`；重启 OpenCode 后让它描述一张截图 |
 | Trae（`trae`） | 技能复制到 `.trae/skills/deepseek-vision/` + 手动导入指引（Settings → Rules & Skills → Create/Import）+ 可选的手动 MCP 配置（Settings → MCP） | Trae 是 IDE——没有 CLI 自动化；MCP 条目需要手动（Trae 的配置路径未验证） |
-| Pi Coding Agent（`pi`） | 共享 `.agents/skills/` 技能；**仅当检测到 pi-mcp-adapter 扩展**（存在 `~/.pi/agent/mcp.json` 或 `~/.pi/agent/npm/`）时才写 `mcpServers.deepseek-vl` 到 `~/.pi/agent/mcp.json`，否则打印安装该扩展的指引 | pi 核心没有 MCP——先装适配器（`pi install npm:pi-mcp-adapter`），重启 pi，再重跑安装器 |
+| Pi Coding Agent（`pi`） | 共享 `.agents/skills/` 技能；指引首选原生安装（`pi install npm:deepseek-vl-support`）——一条命令给 pi 用户级技能；**仅当检测到 pi-mcp-adapter 扩展**（存在 `~/.pi/agent/mcp.json` 或 `~/.pi/agent/npm/`）时才写 `mcpServers.deepseek-vl` 到 `~/.pi/agent/mcp.json` | pi 核心没有 MCP——随包技能无需 MCP 即可用；想要 MCP 工具再装适配器（`pi install npm:pi-mcp-adapter`），重启 pi |
+| Oh My Pi（`omp`） | 共享 `.agents/skills/` 技能（omp 以 70 优先级读取）+ 指引 `omp install npm:deepseek-vl-support`——一条命令同时获得技能**和**自动 MCP 工具（自动注册包内 `.mcp.json`）；不写任何配置文件（omp 用户级 MCP 路径未验证） | omp 是带内置 MCP 的 pi fork；`/reload-plugins` 即时生效，无需重启 |
 | DeepSeek Harness（`dsh`） | 共享 `.agents/skills/` 技能（dsh 以 200 优先级读取 `<project>/.agents/skills`）+ MCP 指引（开发预览版 `@deepseek-ai/dsh-mcp-client` 插件，写 `cordis.patch.yml`） | MCP 是手动的——dsh 没有内置 MCP 支持 |
 
 0.2.3 起新增 5 个 CLI agent 的原生支持（`--target qwen,reasonix,kilo,workbuddy,devin`）。
@@ -308,11 +309,49 @@ OpenCode 是原生 agent，它的产物（`opencode.json` + 共享技能）随�
 选中的 agent 在本机未检测到时，安装时非阻塞地提示：
 `⚠ <Label> was not detected on this machine — install it first (<hint>).`
 
-卸载归属：`uninstall --target opencode|pi|dsh` 只移除各自专属的文件（opencode.json /
+卸载归属：`uninstall --target opencode|pi|omp|dsh` 只移除各自专属的文件（opencode.json /
 mcp.json 中的条目），**保留**共享的 `.agents/skills/deepseek-vision/` 目录——其他
 agent 可能还在用。新增的 CLI agent（qwen/reasonix/kilo/workbuddy/devin）遵循同样规则，
 qwen/workbuddy 还会移除自己的技能副本（`.qwen/skills/`、`.codebuddy/skills/`）和钩子文件。
 只有 `uninstall --target codex` 会删除共享技能目录（或手动删目录）。
+
+## Pi 与 Oh My Pi 原生包
+
+自 0.2.4 起，npm 包与本仓库同时作为这两个 agent 的原生插件——无需向导：
+
+### Pi Coding Agent
+
+```bash
+pi install npm:deepseek-vl-support          # 已发布包
+pi install git:github.com/limccn/deepseek-vl-support@<tag>   # 从 git 安装（钉版本）
+```
+
+- 获得什么：用户级的 `deepseek-vision` 技能（pi 只加载其 `pi` 清单列出的资源——
+  `"pi": { "skills": ["./skills"] }`）。技能自包含：内部调用
+  `npx deepseek-vl-support describe`，不依赖任何 MCP 配置即可工作。
+- **不含** MCP 工具——pi 核心没有 MCP。想要 `describe_image` / `vision_status`
+  工具就装社区适配器（`pi install npm:pi-mcp-adapter`，重启 pi）后重跑安装器，
+  或走向导的 adapter 感知路径。
+- 卸载：`pi remove deepseek-vl-support`（适配器是独立包——用
+  `pi remove pi-mcp-adapter` 单独移除）。
+- 注意：装完要重启 pi；项目级技能首次运行需信任项目。若已通过向导装过项目级技能，
+  包技能与其等效，无需重复安装。
+
+### Oh My Pi
+
+```bash
+omp install npm:deepseek-vl-support         # 已发布包
+omp install github:limccn/deepseek-vl-support@<tag>  # 从 git 安装（钉版本）
+```
+
+- 获得什么：`deepseek-vision` 技能**和**自动 MCP 工具——omp（内置 MCP 的 pi fork）
+  读取包内 `.mcp.json` 并注册 `deepseek-vl` 服务器（`describe_image` /
+  `vision_status`）。`/reload-plugins` 即时生效，无需重启。
+- omp 回退读取 `pi` 清单键，所以同一个包两个 agent 都能用；它也读项目
+  `.agents/skills/` 共享目录（优先级 70），向导装的项目技能同样生效。
+- 卸载：`omp plugin uninstall deepseek-vl-support`。
+- 注意：omp 迭代极快——若未来版本不再接受 `pi` 键回退，请反馈；向导路径
+  （共享技能 + 指引）无论如何都继续可用。
 
 ## Agent Plugins 模式（10 个兼容客户端）
 

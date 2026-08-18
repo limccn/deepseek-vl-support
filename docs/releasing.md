@@ -77,6 +77,11 @@ How to publish a new version of `deepseek-vl-support` to npm.
    - `marketplace.json` is intentionally NOT packaged: it is only meaningful
      in the git repository, where Copilot's `copilot plugin marketplace add`
      and `copilot plugin install <repo>` read it from the repo root.
+   - **pi/omp native plugin** (since 0.2.4): confirm `"pi": { "skills":
+     ["./skills"] }` and the `pi-package` keyword are in the tarball's
+     package.json, and that `skills/deepseek-vision/SKILL.md` + `mcp.json` +
+     `.mcp.json` are present — pi loads only what its `pi` manifest lists,
+     omp (pi-key fallback) auto-registers the package's `.mcp.json`.
    - Must NOT contain: `tests/`, `.trellis/`, `node_modules/`, the source
      `src/` (artifacts already include it), `docs/`, temporary files.
 
@@ -141,6 +146,15 @@ How to publish a new version of `deepseek-vl-support` to npm.
       installs ship Copilot's native MCP file; the test asserts byte-identity
       with mcp.json)
 - [ ] real-endpoint E2E (`e2e-real-endpoint.md`) passes at least once for describe + doctor
+- [ ] pi/omp real-machine e2e (user-owned): `pi install npm:deepseek-vl-support`
+      loads the deepseek-vision skill (restart pi, then `/skill:deepseek-vision`);
+      `pi install git:github.com/limccn/deepseek-vl-support@<tag>` same; `omp
+      install npm:deepseek-vl-support` loads skill + registers the deepseek-vl
+      MCP server (`/reload-plugins`, then call describe_image). Observation
+      items: whether pi requires a restart; behavior of a package skill
+      coexisting with a wizard-installed project skill; and whether the
+      CURRENT omp version still accepts the `pi` key fallback (omp iterates
+      fast — re-check before relying on it)
 - [ ] spike findings (plan-A block+additionalContext is visible to the model in
       Claude Code) are persisted
 - [ ] `npx <pkg>@<ver> version` works on Windows — run it in a separate

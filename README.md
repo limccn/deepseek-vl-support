@@ -87,7 +87,7 @@ just press Enter to accept it.**
 
 | # | Question | What it means | Default |
 |---|---|---|---|
-| 1 | Which agents should get vision? | Pick one or more (comma-separated numbers): `claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `qwen`, `reasonix`, `kilo`, `workbuddy`, `devin`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`. Selected agents that were **not detected** on this machine are flagged during install with an "install it first" hint — non-blocking, the manual guidance still prints | claude, codex + the agents detected on this machine |
+| 1 | Which agents should get vision? | Pick one or more (comma-separated numbers): `claude`, `codex`, `opencode`, `trae`, `pi`, `omp`, `dsh`, `qwen`, `reasonix`, `kilo`, `workbuddy`, `devin`, `copilot`, `cursor`, `kiro`, `openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`. Selected agents that were **not detected** on this machine are flagged during install with an "install it first" hint — non-blocking, the manual guidance still prints | claude, codex + the agents detected on this machine |
 | 2 | Vision endpoint preset | Which "eyes provider" to use — pick the one you have an account for (see the endpoint table below), or choose **Decide later** (last option) to skip endpoint configuration for now | openrouter |
 | 3 | Base URL | The address of that service (the preset fills this in) | from preset |
 | 4 | API key | Your secret code for that service; stored only on your computer | Enter skips |
@@ -289,28 +289,30 @@ npx deepseek-vl-support@latest install --non-interactive --target opencode --pre
 ```
 
 `--target` takes a comma-separated agent list
-(`claude`, `codex`, `opencode`, `trae`, `pi`, `dsh`, `qwen`, `reasonix`,
-`kilo`, `workbuddy`, `devin`, `copilot`, `cursor`, `kiro`, `openclaw`,
-`hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`, `other`);
+(`claude`, `codex`, `opencode`, `trae`, `pi`, `omp`, `dsh`, `qwen`,
+`reasonix`, `kilo`, `workbuddy`, `devin`, `copilot`, `cursor`, `kiro`,
+`openclaw`, `hermes`, `vscode`, `chatgpt-codex`, `grok`, `nanoclaw`,
+`other`);
 the default is `claude,codex` plus the agents detected on this machine. Any
 combination is allowed — e.g. `--target claude,copilot` installs the Claude
 Code hook AND registers the plugin with Copilot in one run. To skip the
 endpoint configuration entirely, pass `--preset later`.
 
-## Skill-based agents (OpenCode / Trae / Pi / DeepSeek Harness)
+## Skill-based agents (OpenCode / Trae / Pi / Oh My Pi / DeepSeek Harness)
 
-Four agents read [Agent Skills](https://agent-skills.org) but do not implement
+Five agents read [Agent Skills](https://agent-skills.org) but do not implement
 the Agent Plugins open standard, so they get their own integration (`--target
-opencode,trae,pi,dsh`). OpenCode is a native agent, so its artifacts
+opencode,trae,pi,omp,dsh`). OpenCode is a native agent, so its artifacts
 (`opencode.json` + the shared skill) follow the install scope you choose. The
-skill-copy agents trae/pi/dsh are **project scope only** and never trigger the
+skill agents trae/pi/omp/dsh are **project scope only** and never trigger the
 install-scope question:
 
 | Agent | What the installer does | Verify / notes |
 |---|---|---|
 | OpenCode (`opencode`) | MCP server entry in `opencode.json` (`mcp.deepseek-vl`, `type: local`, `npx -y deepseek-vl-support mcp`, `enabled: true`) + the shared `.agents/skills/` skill. Project or global by the install scope; the file is deep-merged (your other keys and MCP servers are never touched) and backed up to `opencode.json.bak` before the first change | OpenCode reads `.agents/skills/` natively; restart OpenCode, then ask for a screenshot description |
 | Trae (`trae`) | skill copied to `.trae/skills/deepseek-vision/` + manual import guidance (Settings → Rules & Skills → Create/Import) + optional manual MCP setup (Settings → MCP) | Trae is an IDE — there is no CLI automation; the MCP entry is manual (Trae's config paths are unverified) |
-| Pi Coding Agent (`pi`) | shared `.agents/skills/` skill; writes `mcpServers.deepseek-vl` to `~/.pi/agent/mcp.json` **only when the pi-mcp-adapter extension is detected** (file or `~/.pi/agent/npm/` present), otherwise prints install guidance for it | pi core has no MCP — install the adapter (`pi install npm:pi-mcp-adapter`), restart pi, re-run the installer |
+| Pi Coding Agent (`pi`) | shared `.agents/skills/` skill; guidance prefers the native package (`pi install npm:deepseek-vl-support`) — one command gives pi the user-level skill; writes `mcpServers.deepseek-vl` to `~/.pi/agent/mcp.json` **only when the pi-mcp-adapter extension is detected** (file or `~/.pi/agent/npm/` present) | pi core has no MCP — the packaged skill works without it; for MCP tools add the adapter (`pi install npm:pi-mcp-adapter`), restart pi |
+| Oh My Pi (`omp`) | shared `.agents/skills/` skill (omp reads it at priority 70) + guidance `omp install npm:deepseek-vl-support` — one command gives omp the skill **and** automatic MCP tools (the package's `.mcp.json` is auto-registered); no config file is written (omp's user-level MCP paths are unverified) | omp is a pi fork with built-in MCP; activate with `/reload-plugins` — no restart needed |
 | DeepSeek Harness (`dsh`) | shared `.agents/skills/` skill (dsh reads `<project>/.agents/skills` at rank 200) + MCP guidance for the dev-preview `@deepseek-ai/dsh-mcp-client` plugin (`cordis.patch.yml`) | MCP is manual — dsh has no built-in MCP support |
 
 Five more CLI agents got native support in 0.2.3 (`--target
@@ -329,13 +331,59 @@ scope; every file change is a JSON deep-merge (foreign keys never touched,
 Selected-but-undetected agents are flagged non-blockingly at install time:
 `⚠ <Label> was not detected on this machine — install it first (<hint>).`
 
-Uninstall ownership: `uninstall --target opencode|pi|dsh` removes each agent's
-own artifacts (the opencode.json / mcp.json entries) but **keeps** the shared
-`.agents/skills/deepseek-vision/` tree — it may be used by other agents. The
-native CLI agents (qwen/reasonix/kilo/workbuddy/devin) follow the same rule,
-and qwen/workbuddy also remove their own skill copies (`.qwen/skills/`,
-`.codebuddy/skills/`) and hook files. Only `uninstall --target codex` removes
-the shared skill tree (or delete the directory yourself).
+Uninstall ownership: `uninstall --target opencode|pi|omp|dsh` removes each
+agent's own artifacts (the opencode.json / mcp.json entries) but **keeps** the
+shared `.agents/skills/deepseek-vision/` tree — it may be used by other
+agents. The native CLI agents (qwen/reasonix/kilo/workbuddy/devin) follow the
+same rule, and qwen/workbuddy also remove their own skill copies
+(`.qwen/skills/`, `.codebuddy/skills/`) and hook files. Only
+`uninstall --target codex` removes the shared skill tree (or delete the
+directory yourself).
+
+## Pi and Oh My Pi native packages
+
+Since 0.2.4 the npm package and this repo double as a native plugin for both
+agents — no wizard needed:
+
+### Pi Coding Agent
+
+```bash
+pi install npm:deepseek-vl-support          # published package
+pi install git:github.com/limccn/deepseek-vl-support@<tag>   # from git (pinned)
+```
+
+- What you get: the `deepseek-vision` skill at user level (pi loads only the
+  resources its `pi` manifest lists — `"pi": { "skills": ["./skills"] }`).
+  The skill is self-contained: it calls `npx deepseek-vl-support describe`,
+  so it works without any MCP setup.
+- MCP tools are **not** included — pi core has no MCP. If you want the
+  `describe_image` / `vision_status` tools too, install the community adapter
+  (`pi install npm:pi-mcp-adapter`, restart pi) and re-run this installer, or
+  use the wizard's adapter-aware path.
+- Uninstall: `pi remove deepseek-vl-support` (the adapter is a separate
+  package — remove it with `pi remove pi-mcp-adapter`).
+- Notes: restart pi after installing; trust the project on first run for
+  project-level skills. If you already installed the project-level skill via
+  the wizard, the packaged skill is equivalent — no need to install twice.
+
+### Oh My Pi
+
+```bash
+omp install npm:deepseek-vl-support         # published package
+omp install github:limccn/deepseek-vl-support@<tag>  # from git (pinned)
+```
+
+- What you get: the `deepseek-vision` skill **and** automatic MCP tools —
+  omp (a pi fork with built-in MCP) reads the package's `.mcp.json` and
+  registers the `deepseek-vl` server with `describe_image` / `vision_status`.
+  Activate with `/reload-plugins` — no restart needed.
+- omp falls back to the `pi` manifest key, so the same package works for both
+  agents; it also reads the project `.agents/skills/` shared tree (priority
+  70), so a wizard-installed project skill is picked up as well.
+- Uninstall: `omp plugin uninstall deepseek-vl-support`.
+- Note: omp iterates very fast — if a future version stops accepting the
+  `pi` key fallback, report it; the wizard path (shared skill + guidance)
+  keeps working regardless.
 
 ## Agent Plugins mode (10 compatible clients)
 

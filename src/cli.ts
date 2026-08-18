@@ -20,7 +20,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.2.3";
+const VERSION = "0.2.4";
 
 interface ParsedArgs {
   flags: Map<string, string>;
@@ -106,9 +106,13 @@ detected on this machine):
                 shared .agents/skills/ skill
   trae          Trae: skill copied to .trae/skills/ + manual import/MCP
                 guidance (project scope)
-  pi            Pi Coding Agent: shared .agents/skills/ skill; MCP written to
-                ~/.pi/agent/mcp.json only when pi-mcp-adapter is detected,
-                otherwise guidance (project scope)
+  pi            Pi Coding Agent: shared .agents/skills/ skill; guidance prefers
+                'pi install npm:deepseek-vl-support'; MCP written to
+                ~/.pi/agent/mcp.json only when pi-mcp-adapter is detected
+                (project scope)
+  omp           Oh My Pi: shared .agents/skills/ skill + guidance
+                'omp install npm:deepseek-vl-support' (skill + MCP automatic;
+                project scope)
   dsh           DeepSeek Harness: shared .agents/skills/ skill + MCP guidance
                 (project scope)
   qwen          Qwen Code: skill in .qwen/skills/ + settings.json MCP + Read

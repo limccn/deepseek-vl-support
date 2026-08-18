@@ -234,7 +234,7 @@ test("--target rejects removed values (both/plugin) and unknown names with a cle
     const both = await runCli(project, home, ["install", "--non-interactive", "--target", "both", "--dry-run"]);
     assert.equal(both.code, 1);
     assert.match(both.stderr, /invalid target: "both"/);
-    assert.match(both.stderr, /claude,codex,opencode,trae,pi,dsh,qwen,reasonix,kilo,workbuddy,devin,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/, "error must list the valid agents");
+    assert.match(both.stderr, /claude,codex,opencode,trae,pi,omp,dsh,qwen,reasonix,kilo,workbuddy,devin,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/, "error must list the valid agents");
 
     const plugin = await runCli(project, home, ["uninstall", "--target", "plugin"]);
     assert.equal(plugin.code, 1);

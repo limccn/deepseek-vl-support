@@ -2,7 +2,8 @@
 // config-dir fallbacks), opencode.json deep-merge discipline (backup, user
 // keys preserved, idempotent re-install, uninstall removes our entry only),
 // trae skill copy + user-authored file protection, pi adapter-gated mcp.json,
-// dsh skill-only guidance, and the shared .agents/skills/ ownership rule.
+// omp shared-skill guidance, dsh skill-only guidance, the shared
+// .agents/skills/ ownership rule, and the package.json pi manifest contract.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -24,6 +25,8 @@ import {
 import { MCP_SERVER_NAME, PKG_NAME, SKILL_DIRNAME, SKILL_MARKER } from "../src/identity.ts";
 import { runInstall, runUninstall } from "../src/install.ts";
 import { startMockVisionServer } from "./mock-vision-server.ts";
+
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 let tmp: { base: string; project: string; home: string } | null = null;
 const savedEnv = { ...process.env };
@@ -310,14 +313,15 @@ test("trae uninstall removes the whole managed tree and the empty dirs", async (
 
 // ---------------------------------------------------------------- pi
 
-test("pi: no adapter → mcp.json never written, guidance printed, shared skill still installed", async () => {
+test("pi: no adapter → mcp.json never written, guidance prints the native install first, shared skill still installed", async () => {
   const { base, project, home } = await makeEnv();
   try {
     const warnings: string[] = [];
     const results = await installSkillAgents(sopts(project, home, warnings), detectSkillModuleAgents(home, { PATH: "" }));
     const pi = results.find((r) => r.agent === "pi")!;
     assert.equal(pi.status, "manual");
-    assert.ok(pi.detail.includes("pi-mcp-adapter"), pi.detail);
+    assert.ok(pi.detail.includes(`pi install npm:${PKG_NAME}`), `native install recommended first: ${pi.detail}`);
+    assert.ok(pi.detail.includes("pi-mcp-adapter"), "adapter kept as the tooling supplement");
     assert.ok(!existsSync(join(home, ".pi", "agent", "mcp.json")), "no mcp.json without the adapter");
     assert.ok(existsSync(join(project, ".agents", "skills", SKILL_DIRNAME, "SKILL.md")), "skill installed regardless");
   } finally {
@@ -367,6 +371,72 @@ test("pi: adapter present via ~/.pi/agent/npm dir → mcp.json created", async (
   } finally {
     await rm(base, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------- omp
+
+test("omp: shared skill written + native install guidance; no config file ever touched", async () => {
+  const { base, project, home } = await makeEnv();
+  try {
+    const warnings: string[] = [];
+    const results = await installSkillAgents(sopts(project, home, warnings), detectSkillModuleAgents(home, { PATH: "" }));
+    const omp = results.find((r) => r.agent === "omp")!;
+    assert.equal(omp.status, "ok");
+    assert.ok(omp.detail.includes(`omp install npm:${PKG_NAME}`), `native install command in guidance: ${omp.detail}`);
+    assert.ok(omp.detail.includes("Oh My Pi not detected — install it first"), "omp not detected — install it first");
+    assert.ok(omp.detail.includes("/reload-plugins"), "reload hint present");
+    assert.ok(existsSync(join(project, ".agents", "skills", SKILL_DIRNAME, "SKILL.md")), "shared skill written");
+    assert.ok(!existsSync(join(home, ".omp")), "no omp config dir created");
+    assert.ok(!existsSync(join(project, ".omp")), "no project omp config created");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("omp: detected via PATH → no undetected prefix; uninstall keeps the shared tree", async () => {
+  const { base, project, home } = await makeEnv();
+  try {
+    const bins = join(base, "bins");
+    mkdirSync(bins, { recursive: true });
+    writeFileSync(join(bins, "omp" + (process.platform === "win32" ? ".cmd" : "")), "", "utf8");
+    const warnings: string[] = [];
+    const env = { PATH: bins };
+    const results = await installSkillAgents(sopts(project, home, warnings), detectSkillModuleAgents(home, env));
+    const omp = results.find((r) => r.agent === "omp")!;
+    assert.ok(!omp.detail.includes("not detected"), `no undetected prefix when on PATH: ${omp.detail}`);
+    const un = await uninstallSkillAgents(sopts(project, home, warnings), detectSkillModuleAgents(home, env));
+    const detail = un.find((r) => r.agent === "omp")!.detail;
+    assert.ok(detail.includes(SHARED_SKILL_KEEP_NOTE), detail);
+    assert.ok(existsSync(join(project, ".agents", "skills", SKILL_DIRNAME, "SKILL.md")), "shared skill kept");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("package.json pi manifest: explicit skills glob pointing at an existing dir, pi-package keyword, files whitelist complete", async () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
+    pi?: { skills?: string[] };
+    keywords?: string[];
+    files?: string[];
+  };
+  assert.ok(Array.isArray(pkg.pi?.skills) && pkg.pi.skills.length > 0, "pi.skills present and non-empty (pi: {} would load nothing)");
+  for (const glob of pkg.pi!.skills!) {
+    const dir = join(ROOT, glob.replace(/^\.\//, ""));
+    assert.ok(existsSync(dir), `pi.skills glob "${glob}" resolves to an existing directory`);
+  }
+  assert.ok(pkg.keywords?.includes("pi-package"), "pi-package keyword for the pi.dev gallery");
+  assert.ok(pkg.files?.includes("skills/"), "files whitelist ships skills/");
+  assert.ok(pkg.files?.includes(".mcp.json") && pkg.files?.includes("mcp.json"), "files whitelist ships both mcp manifests");
+});
+
+test("AGENTS ordering: omp sits right after pi and before dsh (D3)", async () => {
+  const { AGENTS } = await import("../src/plugin.ts");
+  const pi = AGENTS.indexOf("pi");
+  const omp = AGENTS.indexOf("omp");
+  const dsh = AGENTS.indexOf("dsh");
+  assert.ok(pi >= 0 && omp >= 0 && dsh >= 0, "pi/omp/dsh all present");
+  assert.equal(omp, pi + 1, "Oh My Pi immediately follows Pi Agent");
+  assert.ok(dsh > omp, "dsh after omp");
 });
 
 // ---------------------------------------------------------------- dsh

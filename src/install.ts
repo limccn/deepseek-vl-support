@@ -1,10 +1,10 @@
 // Installer: numbered-menu wizard (interactive) or flags/env (CI). A single
-// flat agent list of 21 targets — claude, codex, opencode (native installs:
+// flat agent list of 22 targets — claude, codex, opencode (native installs:
 // Claude Code
 // hook + skill + slash command + settings.json deep-merge; Codex config.toml
 // MCP section + AGENTS.md block + models.json fix + project-scope
 // .agents/skills/ write), qwen, reasonix, kilo, workbuddy, devin (native
-// CLI-agent installs, see src/cliagents.ts), trae, pi, dsh (skill-copy
+// CLI-agent installs, see src/cliagents.ts), trae, pi, omp, dsh (skill
 // installs, see src/skillagents.ts) and copilot, cursor, kiro, openclaw,
 // hermes, vscode, chatgpt-codex, grok, nanoclaw, other (Agent Plugins mode:
 // materialize the plugin dir + per-client registration). Idempotent
@@ -118,11 +118,11 @@ export function parseTargets(raw: string | undefined): Agent[] {
   return [...new Set(out)];
 }
 
-/** Build the wizard's first step: ONE multi-select of all 16 agents with
+/** Build the wizard's first step: ONE multi-select of all 22 agents with
  *  pure-name labels (R5: no detection annotations, no explanatory
  *  parentheses). The default is claude + codex plus every agent detected on
  *  this machine (plugin clients and the skill-module agents
- *  opencode/trae/pi/dsh). Selected-but-undetected agents are warned about
+ *  opencode/trae/pi/omp/dsh). Selected-but-undetected agents are warned about
  *  later, at install time (runInstall). Exported for tests. */
 export function agentMenuSpec(home: string, env: NodeJS.ProcessEnv = process.env): MultiMenuSpec {
   const detected = detectPluginClients(home, env);
@@ -143,8 +143,8 @@ export function agentMenuSpec(home: string, env: NodeJS.ProcessEnv = process.env
 
 /** True when the wizard asks the install-scope question: any native agent
  *  (claude/codex/opencode plus the CLI agents qwen/reasonix/kilo/workbuddy/
- *  devin) is selected. Skill agents (trae/pi/dsh) are project-level only and
- *  plugin clients are always global. Exported for tests. */
+ *  devin) is selected. Skill agents (trae/pi/omp/dsh) are project-level only
+ *  and plugin clients are always global. Exported for tests. */
 export function needsScopeQuestion(targets: Agent[]): boolean {
   return targets.some((a) => AGENT_KINDS[a] === "native");
 }
@@ -294,7 +294,7 @@ async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.Proce
   const home = seed.home ?? homedir();
   const notes: string[] = [];
 
-  // Step 1: ONE multi-select of all 16 agents (replaces the old
+  // Step 1: ONE multi-select of all 22 agents (replaces the old
   // claude/codex/both/plugin single-choice menu AND the plugin-client step).
   const targets = (await askMultiMenu(agentMenuSpec(home, env))) as Agent[];
 
@@ -342,9 +342,10 @@ async function collectInteractiveAnswers(seed: InstallOptions, env: NodeJS.Proce
 
   // The scope question is asked only when a native install
   // (claude/codex/opencode) is selected; plugin agents are always global and
-  // skill agents (trae/pi/dsh) are project-level only. When none is native
-  // the step is skipped entirely (endpoint config is written to the global
-  // ~/.deepseek-vl/config.json for plugin runs, project-local otherwise).
+  // skill agents (trae/pi/omp/dsh) are project-level only. When none is
+  // native the step is skipped entirely (endpoint config is written to the
+  // global ~/.deepseek-vl/config.json for plugin runs, project-local
+  // otherwise).
   const global =
     needsScopeQuestion(targets) &&
     (await askMenu(scopeMenuSpec(seed))) === "global";

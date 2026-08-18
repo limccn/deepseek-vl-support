@@ -553,18 +553,18 @@ test("parseTargets: comma list, dedupe, case-insensitive, default; rejects both/
   assert.deepEqual(parseTargets("ChatGpt-Codex,NanoClaw"), ["chatgpt-codex", "nanoclaw"]);
   assert.throws(() => parseTargets("both"), /invalid target: "both"/);
   assert.throws(() => parseTargets("plugin"), /invalid target: "plugin"/);
-  assert.deepEqual(parseTargets("opencode,trae,pi,dsh"), ["opencode", "trae", "pi", "dsh"]);
-  assert.deepEqual(parseTargets("Trae,PI,Dsh"), ["trae", "pi", "dsh"]);
+  assert.deepEqual(parseTargets("opencode,trae,pi,omp,dsh"), ["opencode", "trae", "pi", "omp", "dsh"]);
+  assert.deepEqual(parseTargets("Trae,PI,Omp,Dsh"), ["trae", "pi", "omp", "dsh"]);
   assert.deepEqual(parseTargets("qwen,reasonix,kilo,workbuddy,devin"), ["qwen", "reasonix", "kilo", "workbuddy", "devin"]);
   assert.throws(
     () => parseTargets("bogus"),
-    /expected one of: claude,codex,opencode,trae,pi,dsh,qwen,reasonix,kilo,workbuddy,devin,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/,
+    /expected one of: claude,codex,opencode,trae,pi,omp,dsh,qwen,reasonix,kilo,workbuddy,devin,copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other/,
   );
   assert.throws(() => parseTargets("claude,bogus"), /invalid target: "bogus"/);
   assert.throws(() => parseTargets(","), /invalid target: ""/);
 });
 
-test("agentMenuSpec: one flat 21-option multi-select, pure-name labels, detected defaults", async () => {
+test("agentMenuSpec: one flat 22-option multi-select, pure-name labels, detected defaults", async () => {
   const { base, project, home } = await makeEnv();
   try {
     // hermetic environment: no real CLIs from the host machine; a simulated
@@ -573,7 +573,7 @@ test("agentMenuSpec: one flat 21-option multi-select, pure-name labels, detected
     const env = { PATH: "" };
     const spec = agentMenuSpec(home, env);
     assert.deepEqual(spec.options.map((o) => o.value), AGENTS);
-    assert.equal(spec.options.length, 21);
+    assert.equal(spec.options.length, 22);
     assert.ok(spec.options.every((o) => o.value !== "both" && o.value !== "plugin"), "menu must not offer both/plugin");
     // R5: labels are the pure AGENT_LABELS names — no annotation parens
     for (const o of spec.options) {

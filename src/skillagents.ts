@@ -18,7 +18,7 @@
 //    left untouched and reported as manual
 //  - skill copies carry SKILL_MARKER so uninstall can tell ours from a
 //    user-authored one; a failing agent never blocks the others
-//  - uninstall of opencode/pi/dsh NEVER deletes the shared
+//  - uninstall of opencode/pi/omp/dsh NEVER deletes the shared
 //    .agents/skills/deepseek-vision/ tree (codex owns it) — the keep rule is
 //    stated in the result detail instead
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -28,16 +28,19 @@ import { MCP_SERVER_NAME, PKG_NAME, SKILL_DIRNAME, SKILL_MARKER } from "./identi
 import { findOnPath } from "./plugin.ts";
 import { packagedSkillPath, templatePath } from "./paths.ts";
 
-/** The three skill-copy consumers (opencode is native and handled here too
- *  because it shares the skill write and the JSON-config discipline). */
-export type SkillAgent = "trae" | "pi" | "dsh";
+/** The skill-copy consumers (opencode is native and handled here too
+ *  because it shares the skill write and the JSON-config discipline; omp is
+ *  not a skill-copy consumer either — it reads the shared tree like opencode,
+ *  but has no config file to write, so it lives in this module with the same
+ *  shared-skill helpers). */
+export type SkillAgent = "trae" | "pi" | "omp" | "dsh";
 
 /** Every agent whose install/uninstall drivers live in this module. */
 export type SkillModuleAgent = "opencode" | SkillAgent;
 
-export const SKILL_AGENTS: readonly SkillAgent[] = ["trae", "pi", "dsh"];
+export const SKILL_AGENTS: readonly SkillAgent[] = ["trae", "pi", "omp", "dsh"];
 
-export const SKILL_MODULE_AGENTS: readonly SkillModuleAgent[] = ["opencode", "trae", "pi", "dsh"];
+export const SKILL_MODULE_AGENTS: readonly SkillModuleAgent[] = ["opencode", "trae", "pi", "omp", "dsh"];
 
 // ---------------------------------------------------------------- detection
 
@@ -107,18 +110,20 @@ function cliOrDirDetector(binName: string, label: string, dirOf: (home: string) 
 }
 
 const piDetector = cliOrDirDetector("pi", "pi", (h) => join(h, ".pi", "agent"));
+const ompDetector = cliOrDirDetector("omp", "Oh My Pi", (h) => join(h, ".omp"));
 const dshDetector = cliOrDirDetector("dsh", "dsh", (h) => join(h, ".dsh"));
 
 const DETECTORS: Record<SkillModuleAgent, Detector> = {
   opencode: opencodeDetector,
   trae: traeDetector,
   pi: piDetector,
+  omp: ompDetector,
   dsh: dshDetector,
 };
 
-/** Detect which of the four skill-module agents is available on this
- *  machine. CLI agents (opencode/pi/dsh) are probed via PATH with a config
- *  dir fallback; Trae is a GUI-only directory probe. */
+/** Detect which of the five skill-module agents is available on this
+ *  machine. CLI agents (opencode/pi/omp/dsh) are probed via PATH with a
+ *  config dir fallback; Trae is a GUI-only directory probe. */
 export function detectSkillModuleAgents(
   home: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -135,6 +140,7 @@ export const NOT_DETECTED_HINTS: Record<SkillModuleAgent, string> = {
   opencode: "npm i -g opencode-ai",
   trae: "the Trae IDE — trae.ai",
   pi: "npm i -g @earendil-works/pi-coding-agent",
+  omp: "npm i -g @oh-my-pi/pi-coding-agent",
   dsh: "npx @deepseek-ai/dsh web",
 };
 
@@ -229,7 +235,7 @@ export function writeSkillTree(
 
 /** Shared <project>/.agents/skills/deepseek-vision/ write — the same
  *  location and contract as the Codex project-scope install, used by
- *  opencode/pi/dsh too (global scope skips it: it is a project-level
+ *  opencode/pi/omp/dsh too (global scope skips it: it is a project-level
  *  convention). Extracted from install.ts's installCodex (behavior
  *  unchanged). */
 export function writeSharedAgentsSkill(
@@ -248,7 +254,7 @@ export function writeSharedAgentsSkill(
 }
 
 /** Uninstall ownership rule for the shared .agents/skills tree: only codex
- *  removes it (`uninstall --target codex`); opencode/pi/dsh keep it. */
+ *  removes it (`uninstall --target codex`); opencode/pi/omp/dsh keep it. */
 export const SHARED_SKILL_KEEP_NOTE =
   `shared .agents/skills/deepseek-vision/ kept (may be used by other agents) — ` +
   `remove with \`uninstall --target codex\` or delete the directory.`;
@@ -482,7 +488,7 @@ function registerTrae(opts: SkillAgentOptions, detection: SkillAgentDetection): 
       : `skill write skipped (packaged skill missing — run \`npm run build\` first). ` +
         `Manual: copy skills/deepseek-vision/ to ${dest} and import it in Settings → Rules & Skills. `;
   const extra =
-    `Trae community reports also suggest it may scan .agents/skills/ (unverified) — if you also installed codex/opencode/pi/dsh, the shared skill is already there. ` +
+    `Trae community reports also suggest it may scan .agents/skills/ (unverified) — if you also installed codex/opencode/pi/omp/dsh, the shared skill is already there. ` +
     `MCP (manual, optional): add a server in Trae's MCP settings (Settings → MCP → Manually Add) with command \`npx -y ${PKG_NAME} mcp\`.`;
   return { agent: "trae", status: "manual", detail: notDetected + guidance + extra };
 }
@@ -528,8 +534,9 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
       status: "manual",
       detail:
         notDetected +
-        `pi has no built-in MCP support; the skill was written to .agents/skills/deepseek-vision/ (pi loads project skills only after you trust the project on first run). ` +
-        `To get the MCP tools, install the community extension pi-mcp-adapter (\`pi install npm:pi-mcp-adapter\`, restart pi) and re-run this installer.`,
+        `Prefer the native package: \`pi install npm:${PKG_NAME}\` (or \`pi install git:github.com/limccn/${PKG_NAME}@<tag>\`) — one command gives pi the deepseek-vision skill (user-level, reload-free after restart). ` +
+        `The project-level skill was also written to .agents/skills/deepseek-vision/ (pi loads project skills only after you trust the project on first run; use it for team repos). ` +
+        `To get MCP tools on top, install the community extension pi-mcp-adapter (\`pi install npm:pi-mcp-adapter\`, restart pi) and re-run this installer.`,
     };
   }
 
@@ -547,7 +554,7 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
     return {
       agent: "pi",
       status: "manual",
-      detail: `cannot modify ${file}: ${loaded.manual}. Manual: add "mcpServers": { "${MCP_SERVER_NAME}": { "command": "npx", "args": ["-y", "${PKG_NAME}", "mcp"] } } to ${file}.`,
+      detail: `cannot modify ${file}: ${loaded.manual}. Manual: add "mcpServers": { "${MCP_SERVER_NAME}": { "command": "npx", "args": ["-y", "${PKG_NAME}", "mcp"] } } to ${file}. Prefer the native package instead: \`pi install npm:${PKG_NAME}\` gives the skill with no config edits.`,
     };
   } else {
     const state = jsonEntryAdded(loaded.data, "mcpServers", piMcpEntry());
@@ -555,11 +562,11 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
       return {
         agent: "pi",
         status: "manual",
-        detail: `cannot modify ${file}: "mcpServers" is not a JSON object — left untouched. Manual: add "mcpServers": { "${MCP_SERVER_NAME}": … } to ${file}.`,
+        detail: `cannot modify ${file}: "mcpServers" is not a JSON object — left untouched. Manual: add "mcpServers": { "${MCP_SERVER_NAME}": … } to ${file}. Or prefer the native package: \`pi install npm:${PKG_NAME}\`.`,
       };
     }
     if (state === "present") {
-      detail = `mcpServers["${MCP_SERVER_NAME}"] already present in ${file} — idempotent, no change`;
+      detail = `mcpServers["${MCP_SERVER_NAME}"] already present in ${file} — idempotent, no change; also recommended: \`pi install npm:${PKG_NAME}\` for the packaged skill`;
     } else if (opts.dryRun) {
       detail = `[dry-run] would add mcpServers["${MCP_SERVER_NAME}"] to ${file}`;
     } else {
@@ -570,6 +577,37 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
   }
   const extra = detection.detected ? "" : ` (pi not detected — install it first: ${NOT_DETECTED_HINTS.pi})`;
   return { agent: "pi", status: "ok", detail: detail + extra };
+}
+
+// ---------------------------------------------------------------- omp
+
+/** oh-my-pi (omp) — a pi fork with built-in MCP. Unlike pi, omp reads the
+ *  project `.agents/skills/` shared tree (priority 70) and auto-registers a
+ *  package's `.mcp.json`/`mcp.json` servers once the package is installed
+ *  and enabled. So the installer only writes the shared skill and prints
+ *  the native install command — there is no config file to touch (omp's
+ *  user-level mcp config path is unverified; trae/dsh precedent: don't
+ *  write what is not verified). */
+function registerOmp(opts: SkillAgentOptions, detection: SkillAgentDetection): SkillAgentResult {
+  const log = opts.log ?? (() => {});
+  const warnings = opts.warnings ?? [];
+
+  writeSharedAgentsSkill(opts.cwd, { global: opts.global, update: opts.update, dryRun: opts.dryRun }, { warnings }, log);
+
+  const notDetected = detection.detected
+    ? ""
+    : `Oh My Pi not detected — install it first (${NOT_DETECTED_HINTS.omp}). `;
+  const guidance =
+    `Prefer the native package: \`omp install npm:${PKG_NAME}\` (or \`omp install github:limccn/${PKG_NAME}@<tag>\`) — one command gives omp the deepseek-vision skill AND automatic MCP tools (the package's .mcp.json is auto-registered; activate with /reload-plugins). ` +
+    `The project-level skill was also written to .agents/skills/deepseek-vision/ (omp reads it at priority 70 — use it for team repos). ` +
+    `No config file is written by this installer (omp user-level MCP config paths are unverified).`;
+  return { agent: "omp", status: "ok", detail: notDetected + guidance };
+}
+
+function uninstallOmp(opts: SkillAgentOptions): SkillAgentResult {
+  const notes = ["omp has no own artifacts to remove (its skill lives in the shared .agents/skills/ tree; the native package is removed with `omp plugin uninstall deepseek-vl-support`)"];
+  if (!opts.global) notes.push(SHARED_SKILL_KEEP_NOTE);
+  return { agent: "omp", status: "ok", detail: notes.join("; ") };
 }
 
 function uninstallPi(opts: SkillAgentOptions): SkillAgentResult {
@@ -629,6 +667,7 @@ const REGISTERS: Record<SkillModuleAgent, RegisterDriver> = {
   opencode: registerOpencode,
   trae: registerTrae,
   pi: registerPi,
+  omp: registerOmp,
   dsh: registerDsh,
 };
 
@@ -636,6 +675,7 @@ const UNREGISTERS: Record<SkillModuleAgent, UnregisterDriver> = {
   opencode: uninstallOpencode,
   trae: uninstallTrae,
   pi: uninstallPi,
+  omp: uninstallOmp,
   dsh: uninstallDsh,
 };
 

@@ -3,14 +3,14 @@
   "owner": { "name": "limccn" },
   "metadata": {
     "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
-    "version": "0.2.3"
+    "version": "0.2.4"
   },
   "plugins": [
     {
       "name": "deepseek-vl-support",
       "source": ".",
       "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "author": { "name": "limccn" },
       "homepage": "https://github.com/limccn/deepseek-vl-support",
       "repository": "https://github.com/limccn/deepseek-vl-support",

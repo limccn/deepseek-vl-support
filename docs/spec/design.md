@@ -202,13 +202,13 @@ tool_timeout_sec = 180
 ## 8. 安装器（install.ts）
 
 流程：`install [--global] [--target <agent,...>] [--non-interactive …]`，
-`--target` 为逗号分隔的 agent 列表（claude / codex / opencode / trae / pi / dsh /
-qwen / reasonix / kilo / workbuddy / devin / copilot / cursor / kiro / openclaw /
-hermes / vscode / chatgpt-codex / grok / nanoclaw / other 共 21 项；默认 claude,codex；
-不再支持 both/plugin 取值）：
+`--target` 为逗号分隔的 agent 列表（claude / codex / opencode / trae / pi / omp /
+dsh / qwen / reasonix / kilo / workbuddy / devin / copilot / cursor / kiro /
+openclaw / hermes / vscode / chatgpt-codex / grok / nanoclaw / other 共 22 项；
+默认 claude,codex；不再支持 both/plugin 取值）：
 1. **简单编号菜单式向导**（bilingual；基于 `node:readline/promises`，零依赖；非交互模式走
    flags/env）：每步打印编号选项 + 默认值，输入数字选择、回车取默认、可跳过：
-   ① 目标——**单个多选列表**（共 21 项，标签为纯名称（无检测/机制标注、无 `(default)`
+   ① 目标——**单个多选列表**（共 22 项，标签为纯名称（无检测/机制标注、无 `(default)`
    标记）；默认 claude,codex + 检测到的 agent；选中未检测到的 agent 时安装阶段输出
    "not detected — install it first" 提示，手动指引照常输出，不阻断其余）
    → ② 端点预设（顺序 D2，13 项 + "Decide later"：选后者跳过 baseUrl/key/模型/备用模型
@@ -229,8 +229,13 @@ hermes / vscode / chatgpt-codex / grok / nanoclaw / other 共 21 项；默认 cl
    opencode（native）→ `opencode.json` `mcp["deepseek-vl"]` type:"local" 深合并
    （项目/全局随作用域；备份 + 幂等）+ 共享技能；
    skill 型 agent——trae → 复制技能到 `.trae/skills/deepseek-vision/`（标记管理）+
-   手动导入指引（MCP 不自动化）；pi → 共享技能 + 检测到 pi-mcp-adapter 时才写
-   `~/.pi/agent/mcp.json`（否则仅指引）；dsh → 共享技能 + 仅指引（dev preview 不自动写配置）；
+   手动导入指引（MCP 不自动化）；pi → 共享技能 + 指引首选原生包
+   `pi install npm:deepseek-vl-support`（用户级技能一条命令；0.2.4 起 package.json
+   `pi.skills` 清单显式列出 ./skills + `pi-package` keyword，git 安装源同包根），
+   检测到 pi-mcp-adapter 时才写 `~/.pi/agent/mcp.json`（工具面补充）；omp → 共享技能
+   （omp 读 `.agents/skills/` priority 70）+ 指引 `omp install npm:deepseek-vl-support`
+   （技能 + 包内 .mcp.json 自动注册 MCP，/reload-plugins 生效；回退读 pi 键；无配置
+   文件可写——不写未验证路径）；dsh → 共享技能 + 仅指引（dev preview 不自动写配置）；
    native CLI agent（0.2.3 新增，项目/全局随作用域，检测 = PATH 多 bin + 配置目录回退）——
    qwen → `.qwen/skills/` 复制技能 + `settings.json` 深合并 `mcpServers` + `PreToolUse`
    (matcher Read) 钩子（`node "<abs hook.cjs>"`，JSONC → manual 不重写）；reasonix →
@@ -241,7 +246,7 @@ hermes / vscode / chatgpt-codex / grok / nanoclaw / other 共 21 项；默认 cl
    `type:stdio`（与 reasonix 共享项目 `.mcp.json`，互认幂等，JSONC → manual）；devin →
    共享技能 + `.devin/mcp_config.json` / 全局 `mcp_config.json`；
    **共享技能卸载归属**：`.agents/skills/deepseek-vision/` 由 codex 独占删除（标记校验），
-   opencode/pi/dsh 与新 CLI agent 卸载保留并输出说明（qwen/workbuddy 额外移除各自的
+   opencode/pi/omp/dsh 与新 CLI agent 卸载保留并输出说明（qwen/workbuddy 额外移除各自的
    技能副本与钩子文件）；
    插件 agent（copilot/cursor/kiro/openclaw/hermes/vscode/chatgpt-codex/grok/nanoclaw/other）
    → 物化 `~/.deepseek-vl/plugin/` 一次（恒 4 项）+ 逐客户端注册（生效集合 =

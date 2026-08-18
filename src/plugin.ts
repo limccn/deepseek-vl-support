@@ -70,6 +70,7 @@ export type Agent =
   | "opencode"
   | "trae"
   | "pi"
+  | "omp"
   | "dsh"
   | "qwen"
   | "reasonix"
@@ -96,6 +97,7 @@ export const AGENT_KINDS: Record<Agent, AgentKind> = {
   devin: "native",
   trae: "skill",
   pi: "skill",
+  omp: "skill",
   dsh: "skill",
   copilot: "plugin",
   cursor: "plugin",
@@ -109,15 +111,17 @@ export const AGENT_KINDS: Record<Agent, AgentKind> = {
   other: "plugin",
 };
 
-// CLI-class agents first (native, then skill-copy), the five new CLI-agent
-// integrations (qwen/reasonix/kilo/workbuddy/devin) in CLI→IDE order after
-// dsh, plugin clients last: the wizard groups them in the same order.
+// CLI-class agents first (native, then skill-copy), Oh My Pi right after
+// Pi, the five new CLI-agent integrations (qwen/reasonix/kilo/workbuddy/
+// devin) in CLI→IDE order after dsh, plugin clients last: the wizard groups
+// them in the same order.
 export const AGENTS: readonly Agent[] = [
   "claude",
   "codex",
   "opencode",
   "trae",
   "pi",
+  "omp",
   "dsh",
   "qwen",
   "reasonix",
@@ -156,6 +160,7 @@ export const AGENT_LABELS: Record<Agent, string> = {
   opencode: "OpenCode",
   trae: "Trae",
   pi: "Pi Coding Agent",
+  omp: "Oh My Pi",
   dsh: "DeepSeek Harness",
   qwen: "Qwen Code",
   reasonix: "Reasonix",
