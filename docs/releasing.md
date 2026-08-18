@@ -87,6 +87,16 @@ How to publish a new version of `deepseek-vl-support` to npm.
      present — pi loads only what its `pi` manifest lists; omp (pi-key
      fallback) loads extensions + skills and auto-registers the package's
      `.mcp.json`.
+   - **dsh native plugin** (since 0.2.6): confirm the tarball's package.json
+     carries `"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }`, the
+     `dsh-plugin` keyword, `"main": "./dist/dsh-plugin.js"`, and that
+     `cordis.patch.yml` + `dist/dsh-plugin.js` are present (both are also
+     committed to git, so git installs
+     `dsh plugin --profile web add github:limccn/deepseek-vl-support@<tag>`
+     are self-contained). Rebuild before release — the git-committed bundle
+     must be fresh: `npm run build` regenerates it, then verify it still
+     keeps `@deepseek-ai/dsh-tools` as a bare import (the dsh profile
+     closure injects it at runtime).
    - Must NOT contain: `tests/`, `.trellis/`, `node_modules/`, the source
      `src/` (artifacts already include it), `docs/`, temporary files.
 
@@ -154,6 +164,20 @@ How to publish a new version of `deepseek-vl-support` to npm.
 - [ ] `describe --data-uri` smoke: in a configured project,
       `npx <pkg>@<ver> describe --data-uri "data:image/png;base64,<1px png>"`
       returns a description (same pipeline as the file path)
+- [ ] dsh real-machine e2e (user-owned, since 0.2.6): `dsh plugin --profile
+      web add deepseek-vl-support@latest` loads the `deepseek-vl` plugin layer
+      (restart the dsh web session, then `dsh --profile web --dump-config`
+      shows `deepseek-vl` in the bundle patch stack); the `describe_image`
+      and `vision_status` tools appear in the dsh tools registry with the
+      same names/output as the MCP server and read the same VISION_* /
+      config.json chain; `dsh plugin --profile web add
+      github:limccn/deepseek-vl-support@<tag>` (git install) behaves the
+      same; `remove` + restart uninstalls cleanly. Observation items: real
+      dsh profile closure injection of `@deepseek-ai/*` packages, plugin
+      loading against a real `dist/dsh-plugin.js`, and whether the
+      `.agents/skills/deepseek-vision/` skill (kebab-case `allowed-tools`)
+      is accepted by dsh at rank 200 (frontmatter is fail-closed on
+      camelCase keys — needs verification)
 - [ ] pi/omp real-machine e2e (user-owned, incl. the 0.2.5 extension):
       `pi install npm:deepseek-vl-support` loads the deepseek-vision skill AND
       the native extension (restart pi, then: paste/drag an image into a

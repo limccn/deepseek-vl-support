@@ -1,17 +1,19 @@
 {
   "name": "deepseek-vl-support",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Give DeepSeek (text-only) models vision in Claude Code, Codex, and Agent Plugins clients: describe images via any OpenAI-compatible vision endpoint.",
   "license": "MIT",
   "type": "module",
   "bin": {
     "deepseek-vl-support": "dist/cli.js"
   },
+  "main": "./dist/dsh-plugin.js",
   "files": [
     "dist/",
     "assets/",
     "skills/",
     "extensions/",
+    "cordis.patch.yml",
     "plugin.json",
     "mcp.json",
     ".mcp.json",
@@ -30,7 +32,8 @@
     "image-description",
     "agent-plugins",
     "agent-skills",
-    "pi-package"
+    "pi-package",
+    "dsh-plugin"
   ],
   "pi": {
     "extensions": [
@@ -40,6 +43,11 @@
       "./skills"
     ]
   },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
@@ -47,6 +55,8 @@
     "verify": "npm run build && npm run typecheck && npm run test"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
     "@types/node": "^26.2.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"

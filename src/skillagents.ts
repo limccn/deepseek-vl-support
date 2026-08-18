@@ -648,8 +648,9 @@ function registerDsh(opts: SkillAgentOptions, detection: SkillAgentDetection): S
     ? ""
     : `dsh not detected — install it first (${NOT_DETECTED_HINTS.dsh}). `;
   const guidance =
-    `The deepseek-vision skill now lives in .agents/skills/ (dsh reads <project>/.agents/skills at rank 200 and ~/.agents/skills at 500; the skill runs \`npx ${PKG_NAME} describe\`). ` +
-    `MCP (manual, dev preview): dsh has no built-in MCP — install the plugin \`@deepseek-ai/dsh-mcp-client\` and add a per-server plugin line to your cordis.patch.yml, e.g. serverName: deepseek-vl, transport: stdio, command: npx, args: ['-y', '${PKG_NAME}', 'mcp']. ` +
+    `Prefer the native package: \`dsh plugin --profile web add ${PKG_NAME}@latest\` (or \`dsh plugin --profile web add github:limccn/${PKG_NAME}@<tag>\`) — one command gives dsh the describe_image + vision_status native tools, reading the same VISION_* env / config.json chain (restart the dsh web session after install). ` +
+    `The project-level skill was also written to .agents/skills/deepseek-vision/ (dsh reads it at rank 200 — use it for team repos). ` +
+    `Uninstall: \`dsh plugin --profile web remove ${PKG_NAME}\`. ` +
     `Note: dsh skill frontmatter is fail-closed on camelCase keys; our skill uses \`allowed-tools\` (kebab-case) — whether dsh ignores the key needs real-machine verification.`;
   return { agent: "dsh", status: "manual", detail: notDetected + guidance };
 }

@@ -33,6 +33,21 @@ await Promise.all([
     banner: { js: "/*! deepseek-vl-support-hook */" },
     logLevel: "info",
   }),
+  // DeepSeek Harness cordis plugin. @deepseek-ai/* stay external: the dsh
+  // profile pnpm closure injects them at runtime (they are devDependencies
+  // here for types only — the bundle must keep bare imports). dist/dsh-plugin.js
+  // is committed to git (.gitignore exception) so `dsh plugin add
+  // github:limccn/deepseek-vl-support` works without a build step.
+  build({
+    entryPoints: [join(root, "src/dsh-plugin.ts")],
+    outfile: join(root, "dist/dsh-plugin.js"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node18",
+    external: ["@deepseek-ai/*"],
+    logLevel: "info",
+  }),
 ]);
 
 await rm(join(root, "assets"), { recursive: true, force: true });
@@ -58,4 +73,4 @@ await cp(join(root, "assets", "skill-references", "vision-prompt.md"), join(root
 // Spec clients ignore it; Copilot gets its native file.
 await cp(join(root, "mcp.json"), join(root, ".mcp.json"));
 
-console.log("build ok: dist/cli.js + dist/hook.cjs + assets/ + skills/deepseek-vision/{SKILL.md,references/vision-prompt.md} + .mcp.json");
+console.log("build ok: dist/cli.js + dist/hook.cjs + dist/dsh-plugin.js + assets/ + skills/deepseek-vision/{SKILL.md,references/vision-prompt.md} + .mcp.json");

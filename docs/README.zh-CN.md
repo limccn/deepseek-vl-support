@@ -292,7 +292,7 @@ OpenCode 是原生 agent，它的产物（`opencode.json` + 共享技能）随�
 | Trae（`trae`） | 技能复制到 `.trae/skills/deepseek-vision/` + 手动导入指引（Settings → Rules & Skills → Create/Import）+ 可选的手动 MCP 配置（Settings → MCP） | Trae 是 IDE——没有 CLI 自动化；MCP 条目需要手动（Trae 的配置路径未验证） |
 | Pi Coding Agent（`pi`） | 共享 `.agents/skills/` 技能；指引首选原生安装（`pi install npm:deepseek-vl-support`）——一条命令给 pi 用户级技能和原生扩展（自动图片描述）；**仅当检测到 pi-mcp-adapter 扩展**（存在 `~/.pi/agent/mcp.json` 或 `~/.pi/agent/npm/`）时才写 `mcpServers.deepseek-vl` 到 `~/.pi/agent/mcp.json` | pi 核心没有 MCP——随包技能无需 MCP 即可用；想要 MCP 工具再装适配器（`pi install npm:pi-mcp-adapter`），重启 pi |
 | Oh My Pi（`omp`） | 共享 `.agents/skills/` 技能（omp 以 70 优先级读取）+ 指引 `omp install npm:deepseek-vl-support`——一条命令同时获得技能、自动 MCP 工具**和**原生扩展（自动图片描述；自动注册包内 `.mcp.json`）；不写任何配置文件（omp 用户级 MCP 路径未验证） | omp 是带内置 MCP 的 pi fork；`/reload-plugins` 即时生效，无需重启 |
-| DeepSeek Harness（`dsh`） | 共享 `.agents/skills/` 技能（dsh 以 200 优先级读取 `<project>/.agents/skills`）+ MCP 指引（开发预览版 `@deepseek-ai/dsh-mcp-client` 插件，写 `cordis.patch.yml`） | MCP 是手动的——dsh 没有内置 MCP 支持 |
+| DeepSeek Harness（`dsh`） | 共享 `.agents/skills/` 技能（dsh 以 200 优先级读取 `<project>/.agents/skills`）；指引首选原生安装（`dsh plugin --profile web add deepseek-vl-support@latest`）——一条命令给 dsh `describe_image` + `vision_status` 两个原生工具 | `dsh plugin --profile web add deepseek-vl-support@latest` → 重启 dsh web 会话；向导技能路径继续并存可用 |
 
 0.2.3 起新增 5 个 CLI agent 的原生支持（`--target qwen,reasonix,kilo,workbuddy,devin`）。
 全部按安装范围支持项目级/全局级；每次文件修改都是 JSON 深合并（绝不改动外来键，
@@ -365,6 +365,34 @@ omp install github:limccn/deepseek-vl-support@<tag>  # 从 git 安装（钉版�
 - 卸载：`omp plugin uninstall deepseek-vl-support`。
 - 注意：omp 迭代极快——若未来版本不再接受 `pi` 键回退（extensions 与 skills
   都是），请反馈；向导路径（共享技能 + 指引）无论如何都继续可用。
+
+## DeepSeek Harness 原生插件
+
+自 0.2.6 起，npm 包和本仓库同时作为 DeepSeek Harness（`dsh`）的
+[cordis](https://cordis.js.org) 工具插件发布——无需向导：
+
+```bash
+dsh plugin --profile web add deepseek-vl-support@latest    # 已发布包
+dsh plugin --profile web add github:limccn/deepseek-vl-support@<tag>  # 从 git 安装（钉版本）
+```
+
+- 获得什么：`describe_image` 与 `vision_status` 两个原生工具，进程内注册
+  （无 `npx` 子进程），名称、描述和输出格式与 MCP 服务器完全一致。它们读取
+  与其他路径相同的配置——一次 `deepseek-vl-support config set …` 或
+  `VISION_*` 环境变量设置同样覆盖插件（向导不写任何 dsh 专属配置）。
+- 激活机制：包的 `dsh` 清单键（`bundle.patch`）指向 `cordis.patch.yml`，
+  其 `insert` 行通过包 main entry（`dist/dsh-plugin.js`）加载插件。dsh
+  profile closure 在运行时注入 `@deepseek-ai/cordis` +
+  `@deepseek-ai/dsh-tools`——插件不附带任何官方包的副本。
+- 向导技能路径仍然可用并与插件互补：dsh 为团队仓库读取共享的
+  `.agents/skills/deepseek-vision/` 技能（优先级 200）；原生工具与技能并存
+  无冲突。
+- 验证：`dsh --profile web --dump-config` 在 bundle patch 栈中显示
+  `deepseek-vl` 层。
+- 卸载：`dsh plugin --profile web remove deepseek-vl-support`（然后重启 dsh
+  web 会话）。
+- 注意：装完要重启 dsh web 会话；本地 `add .` 安装是 pnpm 的 `file:` 复制而
+  非链接——改完代码要 `remove` 后重新 `add .`。
 
 ## Agent Plugins 模式（10 个兼容客户端）
 

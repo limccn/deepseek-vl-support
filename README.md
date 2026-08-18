@@ -313,7 +313,7 @@ install-scope question:
 | Trae (`trae`) | skill copied to `.trae/skills/deepseek-vision/` + manual import guidance (Settings → Rules & Skills → Create/Import) + optional manual MCP setup (Settings → MCP) | Trae is an IDE — there is no CLI automation; the MCP entry is manual (Trae's config paths are unverified) |
 | Pi Coding Agent (`pi`) | shared `.agents/skills/` skill; guidance prefers the native package (`pi install npm:deepseek-vl-support`) — one command gives pi the user-level skill and a native extension (automatic image description); writes `mcpServers.deepseek-vl` to `~/.pi/agent/mcp.json` **only when the pi-mcp-adapter extension is detected** (file or `~/.pi/agent/npm/` present) | pi core has no MCP — the packaged skill works without it; for MCP tools add the adapter (`pi install npm:pi-mcp-adapter`), restart pi |
 | Oh My Pi (`omp`) | shared `.agents/skills/` skill (omp reads it at priority 70) + guidance `omp install npm:deepseek-vl-support` — one command gives omp the skill, automatic MCP tools **and** the native extension (the package's `.mcp.json` is auto-registered); no config file is written (omp's user-level MCP paths are unverified) | omp is a pi fork with built-in MCP; activate with `/reload-plugins` — no restart needed |
-| DeepSeek Harness (`dsh`) | shared `.agents/skills/` skill (dsh reads `<project>/.agents/skills` at rank 200) + MCP guidance for the dev-preview `@deepseek-ai/dsh-mcp-client` plugin (`cordis.patch.yml`) | MCP is manual — dsh has no built-in MCP support |
+| DeepSeek Harness (`dsh`) | shared `.agents/skills/` skill (dsh reads `<project>/.agents/skills` at rank 200); guidance prefers the native package (`dsh plugin --profile web add deepseek-vl-support@latest`) — one command gives dsh the `describe_image` + `vision_status` native tools | `dsh plugin --profile web add deepseek-vl-support@latest` → restart the dsh web session; the wizard skill path keeps working alongside |
 
 Five more CLI agents got native support in 0.2.3 (`--target
 qwen,reasonix,kilo,workbuddy,devin`). All are project or global by the install
@@ -402,6 +402,39 @@ omp install github:limccn/deepseek-vl-support@<tag>  # from git (pinned)
 - Note: omp iterates very fast — if a future version stops accepting the
   `pi` key fallback (extensions and skills both), report it; the wizard path
   (shared skill + guidance) keeps working regardless.
+
+## DeepSeek Harness native plugin
+
+Since 0.2.6 the npm package and this repo double as a native
+[cordis](https://cordis.js.org) tool plugin for DeepSeek Harness (`dsh`) —
+no wizard needed:
+
+```bash
+dsh plugin --profile web add deepseek-vl-support@latest    # published package
+dsh plugin --profile web add github:limccn/deepseek-vl-support@<tag>  # from git (pinned)
+```
+
+- What you get: two native tools, `describe_image` and `vision_status`,
+  registered in-process (no `npx` subprocess), with the exact same names,
+  descriptions and output format as the MCP server. They read the same
+  configuration as every other surface — one `deepseek-vl-support config
+  set …` or `VISION_*` env setup covers the plugin too (the wizard does not
+  write any dsh-specific config).
+- Activation: the package's `dsh` manifest key (`bundle.patch`) points at
+  `cordis.patch.yml`, whose `insert` row loads the plugin through the
+  package main entry (`dist/dsh-plugin.js`). The dsh profile closure injects
+  `@deepseek-ai/cordis` + `@deepseek-ai/dsh-tools` at runtime — the plugin
+  ships no copies of the official packages.
+- The wizard skill path still works and complements the plugin: the shared
+  `.agents/skills/deepseek-vision/` skill (rank 200) is read by dsh for
+  team repos; native tools and skill coexist without conflict.
+- Verify: `dsh --profile web --dump-config` shows the `deepseek-vl` layer
+  in the bundle patch stack.
+- Uninstall: `dsh plugin --profile web remove deepseek-vl-support` (then
+  restart the dsh web session).
+- Notes: restart the dsh web session after install; editing a local `add .`
+  install is a pnpm `file:` copy, not a link — `remove` then `add .` again
+  to pick up changes.
 
 ## Agent Plugins mode (10 compatible clients)
 

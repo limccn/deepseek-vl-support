@@ -451,14 +451,19 @@ test("AGENTS ordering: omp sits right after pi and before dsh (D3)", async () =>
 
 // ---------------------------------------------------------------- dsh
 
-test("dsh: shared skill + manual MCP guidance; uninstall removes no own artifacts", async () => {
+test("dsh: shared skill + native plugin guidance; uninstall removes no own artifacts", async () => {
   const { base, project, home } = await makeEnv();
   try {
     const warnings: string[] = [];
     const results = await installSkillAgents(sopts(project, home, warnings), detectSkillModuleAgents(home, { PATH: "" }));
     const dsh = results.find((r) => r.agent === "dsh")!;
     assert.equal(dsh.status, "manual");
-    assert.ok(dsh.detail.includes("cordis.patch.yml"), dsh.detail);
+    assert.ok(dsh.detail.includes("dsh plugin --profile web add deepseek-vl-support@latest"), dsh.detail);
+    assert.ok(dsh.detail.includes("github:limccn/deepseek-vl-support"), "git install variant mentioned");
+    assert.ok(dsh.detail.includes("dsh plugin --profile web remove deepseek-vl-support"), "uninstall command mentioned");
+    assert.ok(dsh.detail.includes(".agents/skills/deepseek-vision/"), "project-level skill copy still explained");
+    assert.ok(!dsh.detail.includes("@deepseek-ai/dsh-mcp-client"), "old dev-preview MCP hand-write guidance removed");
+    assert.ok(!dsh.detail.includes("cordis.patch.yml"), "no cordis.patch.yml hand-write guidance remains");
     assert.ok(dsh.detail.includes("dsh not detected — install it first"), dsh.detail);
     assert.ok(existsSync(join(project, ".agents", "skills", SKILL_DIRNAME, "SKILL.md")));
     const un = await uninstallSkillAgents(sopts(project, home, warnings), detectSkillModuleAgents(home, { PATH: "" }));
