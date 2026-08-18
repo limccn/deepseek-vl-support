@@ -99,7 +99,8 @@ Trae、Pi、DeepSeek Harness 不支持该标准，必须走上面的 npx 向导�
 端点设置。选择 **Decide later**（或 `--preset later`）会静默保留已有配置。
 某个目标位置已存在技能文件（之前装过，或手写的）时，还会出现第二次确认：
 `Keep existing skills`（保留现有技能，默认）或 `Overwrite with packaged version`
-（用打包版本覆盖）。非交互安装从不提问——已有配置和技能一律保留。
+（用打包版本覆盖）。非交互安装从不提问——配置照旧深合并写入，技能文件沿用既有规则
+（受管文件保留、手写文件跳过）。
 
 装完之后：
 

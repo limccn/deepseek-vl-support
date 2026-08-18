@@ -239,14 +239,11 @@ function hookCommandFor(hookFile: string): string {
 /** Shared .agents/skills/deepseek-vision/ write for global scope: the
  *  skillagents helper skips global (it is the project-level convention), but
  *  the five CLI agents officially read the user-level ~/.agents/skills/
- *  (research: reasonix/kilo/devin). */
+ *  (research: reasonix/kilo/devin). Delegates to writeSkillTree so the
+ *  wizard's keep/overwrite answer and the per-file dry-run logs apply here
+ *  exactly like every other skill tree. */
 function writeGlobalSharedSkill(opts: CliAgentOptions, log: (msg: string) => void): void {
-  const warnings = opts.warnings ?? [];
-  if (opts.dryRun) {
-    log(`[dry-run] would write ${join(opts.home, ".agents", "skills", SKILL_DIRNAME)}`);
-    return;
-  }
-  writeSkillTree(join(opts.home, ".agents", "skills", SKILL_DIRNAME), opts, log, warnings);
+  writeSkillTree(join(opts.home, ".agents", "skills", SKILL_DIRNAME), opts, log, opts.warnings ?? []);
 }
 
 /** Default npx MCP entry (mcpServers shape). */

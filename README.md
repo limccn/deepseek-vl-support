@@ -112,7 +112,9 @@ answers in)` — the default keeps your current endpoint settings. Choosing
 asking. When a skill file already exists at one of the target locations (from
 a previous install, or written by hand), a second confirmation follows: `Keep
 existing skills` (default) or `Overwrite with packaged version`. Non-interactive
-runs never ask — an existing config and existing skills are kept.
+runs never ask — the config is deep-merged as in previous releases and skill
+files follow the existing rules (managed files are kept, hand-written files
+are skipped).
 
 When it finishes:
 
