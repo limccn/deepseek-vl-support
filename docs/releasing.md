@@ -194,6 +194,13 @@ How to publish a new version of `deepseek-vl-support` to npm.
       skill coexisting with a wizard-installed project skill; and whether the
       CURRENT omp version still accepts the `pi` key fallback (omp iterates
       fast — re-check before relying on it)
+- [ ] install-wizard keep/overwrite e2e (user-owned, since 0.2.7): with an
+      existing `config.json` (or existing skill file at a target location),
+      the wizard's `Keep existing / Overwrite` menus appear (default `[keep]`
+      on both); `Overwrite` on a hand-written skill backs the file up to
+      `<file>.bak` before replacing it; `--update` refreshes managed files and
+      backs up + replaces hand-written skill files without asking;
+      non-interactive runs keep existing config and skills silently
 - [ ] spike findings (plan-A block+additionalContext is visible to the model in
       Claude Code) are persisted
 - [ ] `npx <pkg>@<ver> version` works on Windows — run it in a separate
