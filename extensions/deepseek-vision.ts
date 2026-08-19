@@ -18,6 +18,8 @@
 // image block and the transform return against the live pi.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { writeFile, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,6 +32,21 @@ const CLI = join(pkgRoot, "dist", "cli.js");
 
 const DESCRIBE_TIMEOUT_MS = 120_000;
 const VISION_PROMPT = "describe it very precisely (text, UI, code, errors)";
+
+/** Extension of the temp file written for each image. The CLI sniffs magic
+ *  bytes first (mimeForPath is only a fallback), so a wrong-but-close ext
+ *  never breaks detection — the mapping is cosmetic. */
+const EXT_BY_MIME: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/bmp": ".bmp",
+};
+
+/** Uniqueness for concurrent describes (bun/pi single-threaded, but a
+ *  re-entrant hook could race on the same counter) — pid + counter. */
+let tmpCounter = 0;
 
 /** The CLI must exist for every delegation — an anomalous install (no
  *  dist/cli.js) degrades to a single notify per session, not per turn. */
@@ -112,7 +129,12 @@ function runCli(args: string[], signal?: AbortSignal, timeoutMs = DESCRIBE_TIMEO
   });
 }
 
-/** Describe one image data URI via the CLI. Returns the description text. */
+/** Describe one image data URI via the CLI. The data URI is decoded to a
+ *  temp file and passed as a path, never as a command-line argument: argv
+ *  is capped at ~32 KB on Windows (and ~128 KB on Linux/macOS), while real
+ *  images routinely exceed that once base64-encoded (spawn ENAMETOOLONG —
+ *  the 0.2.7 real-machine finding). The temp file is deleted in a finally
+ *  even when the CLI exits non-zero. Returns the description text. */
 async function describeImage(
   dataUri: string,
   question: string,
@@ -126,7 +148,19 @@ async function describeImage(
     }
     throw new Error("missing dist/cli.js");
   }
-  return runCli(["describe", "--data-uri", dataUri, question], signal);
+  const m = /^data:([^;]+);base64,(.+)$/s.exec(dataUri);
+  if (!m) throw new Error("invalid data URI");
+  const mime = m[1].toLowerCase();
+  const ext = EXT_BY_MIME[mime] ?? ".img";
+  const tmpPath = join(tmpdir(), `dvs-vision-${process.pid}-${tmpCounter++}${ext}`);
+  await writeFile(tmpPath, Buffer.from(m[2], "base64"));
+  try {
+    return await runCli(["describe", tmpPath, question], signal);
+  } finally {
+    await unlink(tmpPath).catch(() => {
+      /* temp cleanup is best-effort */
+    });
+  }
 }
 
 function extractDataUri(image: unknown): string | null {

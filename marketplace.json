@@ -1,21 +1,32 @@
 {
   "name": "deepseek-vl-support",
-  "owner": { "name": "limccn" },
+  "owner": {
+    "name": "limccn"
+  },
   "metadata": {
     "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
-    "version": "0.2.7"
+    "version": "0.2.8"
   },
   "plugins": [
     {
       "name": "deepseek-vl-support",
       "source": ".",
       "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
-      "version": "0.2.7",
-      "author": { "name": "limccn" },
+      "version": "0.2.8",
+      "author": {
+        "name": "limccn"
+      },
       "homepage": "https://github.com/limccn/deepseek-vl-support",
       "repository": "https://github.com/limccn/deepseek-vl-support",
       "license": "MIT",
-      "keywords": ["deepseek", "vision", "mcp", "image-description", "openai-compatible"]
+      "keywords": [
+        "deepseek",
+        "vision",
+        "mcp",
+        "image-description",
+        "openai-compatible"
+      ]
     }
-  ]
+  ],
+  "version": "0.2.8"
 }

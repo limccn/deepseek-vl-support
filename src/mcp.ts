@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 import { PKG_NAME } from "./identity.ts";
 import { callDescribeImage, callVisionStatus, describeImageSchema, visionStatusSchema } from "./tools.ts";
 
-const SERVER_VERSION = "0.2.7";
+const SERVER_VERSION = "0.2.8";
 const PROTOCOL_VERSION = "2024-11-05";
 
 interface JsonRpcRequest {

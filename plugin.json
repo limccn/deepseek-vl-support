@@ -1,11 +1,19 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "deepseek-vl-support",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
-  "author": { "name": "limccn" },
+  "author": {
+    "name": "limccn"
+  },
   "homepage": "https://github.com/limccn/deepseek-vl-support",
   "repository": "https://github.com/limccn/deepseek-vl-support",
   "license": "MIT",
-  "keywords": ["deepseek", "vision", "mcp", "image-description", "openai-compatible"]
+  "keywords": [
+    "deepseek",
+    "vision",
+    "mcp",
+    "image-description",
+    "openai-compatible"
+  ]
 }
