@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
-    "version": "0.2.8"
+    "version": "0.2.9"
   },
   "plugins": [
     {
       "name": "deepseek-vl-support",
       "source": ".",
       "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
-      "version": "0.2.8",
+      "version": "0.2.9",
       "author": {
         "name": "limccn"
       },
@@ -28,5 +28,5 @@
       ]
     }
   ],
-  "version": "0.2.8"
+  "version": "0.2.9"
 }
