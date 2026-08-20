@@ -171,7 +171,7 @@ async function handleStart(input: Record<string, unknown>): Promise<void> {
   const warning =
     `[deepseek-vl-support] Vision not configured correctly\n` +
     problems.map((p) => `- ${p}`).join("\n") +
-    `\nRun \`npx deepseek-vl-support doctor\` for details. ` +
+    `\nRun \`npx @limccn/deepseek-vl-support doctor\` for details. ` +
     `Images will NOT be described automatically.`;
   output({
     hookSpecificOutput: {

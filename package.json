@@ -1,8 +1,12 @@
 {
-  "name": "deepseek-vl-support",
-  "version": "0.2.9",
+  "name": "@limccn/deepseek-vl-support",
+  "version": "0.3.0",
   "description": "Give DeepSeek (text-only) models vision in Claude Code, Codex, and Agent Plugins clients: describe images via any OpenAI-compatible vision endpoint.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/limccn/deepseek-vl-support.git"
+  },
   "type": "module",
   "bin": {
     "deepseek-vl-support": "dist/cli.js"

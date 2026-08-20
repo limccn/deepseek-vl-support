@@ -4,7 +4,7 @@
     "deepseek-vl": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "deepseek-vl-support", "mcp"]
+      "args": ["-y", "@limccn/deepseek-vl-support", "mcp"]
     }
   }
 }

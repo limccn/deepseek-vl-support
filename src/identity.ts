@@ -2,9 +2,17 @@
 // These strings are the ONLY thing that marks a file/entry as ours:
 // uninstall removes artifacts that carry them, and never touches files
 // that don't. Keep them stable across releases.
-export const PKG_NAME = "deepseek-vl-support";
+export const PKG_NAME = "@limccn/deepseek-vl-support";
 export const BIN_NAME = "deepseek-vl-support";
 export const MCP_SERVER_NAME = "deepseek-vl";
+// Plugin identity (marketplace/plugin name for codex/copilot/hermes/grok/
+// openclaw/nanoclaw) — distinct from the npm package name (PKG_NAME) since
+// 0.3.0 renamed the package to a scoped form.
+export const PLUGIN_NAME = "deepseek-vl-support";
+// Marker for the managed TOML block (reasonix config.toml). Deliberately NOT
+// PKG_NAME: old installs carry `# deepseek-vl-support:start` blocks and the
+// scoped rename must not orphan them (install --update refresh depends on it).
+export const MANAGED_MARKER = "deepseek-vl-support";
 
 export const CONFIG_DIR = ".deepseek-vl";
 export const CONFIG_FILENAME = "config.json";

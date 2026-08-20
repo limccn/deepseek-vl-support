@@ -59,6 +59,9 @@ export function tomlEscape(s: string): string {
 }
 
 export function buildMcpBlock(version: string): string {
+  // MCP_SERVER_NAME is a fixed bare-TOML-safe name (no "@" or "/"): a scoped
+  // package name as a bare TOML key/value (or a YAML bare scalar) is rejected
+  // by parsers, so PKG_NAME may only appear inside these quoted strings.
   const args = ["-y", `${PKG_NAME}@${version}`, "mcp"].map(tomlEscape).join(", ");
   return (
     `[mcp_servers.${MCP_SERVER_NAME}]\n` +

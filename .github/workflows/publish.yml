@@ -1,0 +1,52 @@
+# Dual-publish workflow: every published GitHub release pushes
+# @limccn/deepseek-vl-support to BOTH npmjs and GitHub Packages.
+# The repo package.json is permanently scoped (0.3.0+), so neither job
+# needs an `npm pkg set` — the tarball's name is correct by construction.
+#
+# GitHub Packages: the first publish defaults to PRIVATE — flip it to
+# public in the package settings page (Actions `--access public` is not
+# documented for GH Packages; UI is authoritative).
+#
+# Note: `npm install` (not `npm ci`) — package-lock.json is deliberately
+# NOT committed in this repo (see .gitignore).
+name: Publish scoped package
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-npmjs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+      - run: npm install
+      - run: npm run build
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-github-packages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: "@limccn"
+      - run: npm install
+      - run: npm run build
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

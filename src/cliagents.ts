@@ -39,6 +39,7 @@ import type { SettingsFile } from "./hooksettings.ts";
 import {
   HOOK_FILENAME,
   HOOK_MARKER,
+  MANAGED_MARKER,
   MCP_SERVER_NAME,
   PKG_NAME,
   SKILL_DIRNAME,
@@ -253,10 +254,12 @@ function npxMcpEntry(): Record<string, unknown> {
 
 // ---------------------------------------------------------------- toml block
 
-const TOML_START = `# ${PKG_NAME}:start`;
-const TOML_END = `# ${PKG_NAME}:end`;
+const TOML_START = `# ${MANAGED_MARKER}:start`;
+const TOML_END = `# ${MANAGED_MARKER}:end`;
 
-/** The managed [[plugins]] block written into the Reasonix config.toml. */
+/** The managed [[plugins]] block written into the Reasonix config.toml.
+ *  Keys/names stay MCP_SERVER_NAME (bare-TOML-safe: no "@" or "/"); the scoped
+ *  PKG_NAME only ever appears inside JSON.stringify-quoted strings. */
 function reasonixTomlBlock(): string {
   return [
     TOML_START,

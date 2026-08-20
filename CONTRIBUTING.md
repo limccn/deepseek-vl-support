@@ -9,7 +9,7 @@ does and how users install it; [CLAUDE.md](CLAUDE.md) is the technical reference
 Before opening an issue, run the health check and include its output:
 
 ```bash
-npx deepseek-vl-support@latest doctor
+npx @limccn/deepseek-vl-support@latest doctor
 ```
 
 Also include:
@@ -57,6 +57,8 @@ is for release-time validation, not day-to-day development.
 
 ## Releasing
 
-Releases are manual and maintainer-only (never auto-published). The full checklist lives
-in [CLAUDE.md](CLAUDE.md#release-process-was-docsreleasingmd) — it covers the four version
-constants, the pack manifest, publish, and the post-publish smoke test.
+Releases are manual and maintainer-only; publishing a GitHub release also triggers the
+dual-publish workflow (`.github/workflows/publish.yml` → npmjs + GitHub Packages). The
+full checklist lives in [CLAUDE.md](CLAUDE.md#release-process-was-docsreleasingmd) — it
+covers the four version constants, the pack manifest, publish, and the post-publish smoke
+test.

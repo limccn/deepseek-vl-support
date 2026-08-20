@@ -47,7 +47,7 @@ VS Code、OpenCode、Trae、Qwen Code 等 22 种。
 
 ```bash
 cd 你的项目路径
-npx deepseek-vl-support@latest install
+npx @limccn/deepseek-vl-support@latest install
 ```
 
 就这么简单——向导会自动检测你电脑上装了哪些 agent，然后问 7 个简短的问题。
@@ -58,7 +58,7 @@ npx deepseek-vl-support@latest install
 装完以后，**重启你的会话**（安装器会打印这个提醒，这是生效的必要步骤）。可选验证：
 
 ```bash
-npx deepseek-vl-support@latest doctor    # 看到 [OK] 即正常
+npx @limccn/deepseek-vl-support@latest doctor    # 看到 [OK] 即正常
 ```
 
 在同一项目里重复安装？它会问是否保留当前设置——回车即保留。
@@ -73,7 +73,7 @@ Grok Bot、NanoClaw 以及其他符合该标准的 agent），直接在对话里
 
 安装后，用 
 ```
-npx deepseek-vl-support@latest install --target <你的agent>
+npx @limccn/deepseek-vl-support@latest install --target <你的agent>
 ```
 （或环境变量，见[修改设置](#修改设置)）配置一次看图服务即可。
 
@@ -86,7 +86,7 @@ npx deepseek-vl-support@latest install --target <你的agent>
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target claude
+npx @limccn/deepseek-vl-support@latest install --target claude
 ```
 
 **2. 装完** — 重启会话，然后直接读取任意图片：描述会自动送达（手动触发：
@@ -104,7 +104,7 @@ npx deepseek-vl-support@latest install --target claude
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target codex
+npx @limccn/deepseek-vl-support@latest install --target codex
 ```
 
 **3. 装完** — 重启 Codex，然后让它描述一张图片。
@@ -116,7 +116,7 @@ npx deepseek-vl-support@latest install --target codex
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target opencode
+npx @limccn/deepseek-vl-support@latest install --target opencode
 ```
 
 **2. 装完** — 重启 OpenCode。
@@ -128,7 +128,7 @@ npx deepseek-vl-support@latest install --target opencode
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target trae
+npx @limccn/deepseek-vl-support@latest install --target trae
 ```
 
 **2. 装完** — 手动导入一次技能：设置 → 规则与技能 → 创建/导入。
@@ -140,12 +140,12 @@ npx deepseek-vl-support@latest install --target trae
 
 **1. 原生安装（推荐）** — 一条命令同时装上技能和扩展
 ```bash
-pi install npm:deepseek-vl-support
+pi install npm:@limccn/deepseek-vl-support
 ```
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target pi
+npx @limccn/deepseek-vl-support@latest install --target pi
 ```
 
 **3. 装完** — 重启 Pi。
@@ -157,12 +157,12 @@ npx deepseek-vl-support@latest install --target pi
 
 **1. 原生安装（推荐）**
 ```bash
-omp install npm:deepseek-vl-support
+omp install npm:@limccn/deepseek-vl-support
 ```
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target omp
+npx @limccn/deepseek-vl-support@latest install --target omp
 ```
 
 **3. 装完** — 执行 `/reload-plugins` 激活（无需重启）。
@@ -174,12 +174,12 @@ npx deepseek-vl-support@latest install --target omp
 
 **1. 原生安装（推荐）** — 进程内获得工具，不启子进程
 ```bash
-dsh plugin --profile web add deepseek-vl-support@latest
+dsh plugin --profile web add @limccn/deepseek-vl-support@latest
 ```
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target dsh
+npx @limccn/deepseek-vl-support@latest install --target dsh
 ```
 
 **3. 装完** — 重启 dsh web 会话。
@@ -191,7 +191,7 @@ npx deepseek-vl-support@latest install --target dsh
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target qwen
+npx @limccn/deepseek-vl-support@latest install --target qwen
 ```
 
 **2. 装完** — 重启 Qwen Code。
@@ -203,7 +203,7 @@ npx deepseek-vl-support@latest install --target qwen
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target reasonix
+npx @limccn/deepseek-vl-support@latest install --target reasonix
 ```
 
 **2. 装完** — 重启 Reasonix。
@@ -215,7 +215,7 @@ npx deepseek-vl-support@latest install --target reasonix
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target kilo
+npx @limccn/deepseek-vl-support@latest install --target kilo
 ```
 
 **2. 装完** — 重启 Kilo Code。
@@ -227,7 +227,7 @@ npx deepseek-vl-support@latest install --target kilo
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target workbuddy
+npx @limccn/deepseek-vl-support@latest install --target workbuddy
 ```
 
 **2. 装完** — 重启 WorkBuddy。
@@ -239,7 +239,7 @@ npx deepseek-vl-support@latest install --target workbuddy
 
 **1. 安装**
 ```bash
-npx deepseek-vl-support@latest install --target devin
+npx @limccn/deepseek-vl-support@latest install --target devin
 ```
 
 **2. 装完** — 重启 Devin。（Devin 的 CLI 没有官方 npm 包——从
@@ -257,7 +257,7 @@ npx deepseek-vl-support@latest install --target devin
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target copilot
+npx @limccn/deepseek-vl-support@latest install --target copilot
 ```
 
 **3. 装完** — 用 `copilot plugin list` 检查。
@@ -274,7 +274,7 @@ npx deepseek-vl-support@latest install --target copilot
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target cursor
+npx @limccn/deepseek-vl-support@latest install --target cursor
 ```
 
 **3. 装完** — 重载窗口（Developer → Reload Window）。
@@ -291,7 +291,7 @@ npx deepseek-vl-support@latest install --target cursor
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target kiro
+npx @limccn/deepseek-vl-support@latest install --target kiro
 ```
 
 **3. 装完** — 手动导入一次：Kiro → Powers → 添加自定义 Power → 从文件夹导入 → 选择
@@ -309,7 +309,7 @@ npx deepseek-vl-support@latest install --target kiro
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target openclaw
+npx @limccn/deepseek-vl-support@latest install --target openclaw
 ```
 
 **3. 装完** — 重启网关，用 `openclaw plugins list` 检查。
@@ -326,7 +326,7 @@ npx deepseek-vl-support@latest install --target openclaw
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target hermes
+npx @limccn/deepseek-vl-support@latest install --target hermes
 ```
 
 **3. 装完** — 用 `hermes plugins list` 检查。
@@ -343,7 +343,7 @@ npx deepseek-vl-support@latest install --target hermes
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target vscode
+npx @limccn/deepseek-vl-support@latest install --target vscode
 ```
 
 **3. 装完** — 重载窗口。
@@ -360,7 +360,7 @@ npx deepseek-vl-support@latest install --target vscode
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target chatgpt-codex
+npx @limccn/deepseek-vl-support@latest install --target chatgpt-codex
 ```
 
 **3. 装完** — 新开一个 Codex 线程（或 ChatGPT 会话）。
@@ -377,7 +377,7 @@ npx deepseek-vl-support@latest install --target chatgpt-codex
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target grok
+npx @limccn/deepseek-vl-support@latest install --target grok
 ```
 
 **3. 装完** — 在插件页按 `r`（刷新）或新开会话。
@@ -394,7 +394,7 @@ npx deepseek-vl-support@latest install --target grok
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target nanoclaw
+npx @limccn/deepseek-vl-support@latest install --target nanoclaw
 ```
 
 **3. 装完** — 按打印的指引运行 `ncl wirings create`。
@@ -411,7 +411,7 @@ npx deepseek-vl-support@latest install --target nanoclaw
 
 **2. 或用 npx 安装**
 ```bash
-npx deepseek-vl-support@latest install --target other
+npx @limccn/deepseek-vl-support@latest install --target other
 ```
 
 </details>
@@ -422,13 +422,13 @@ npx deepseek-vl-support@latest install --target other
 任意组合都可以，逗号分隔：
 
 ```bash
-npx deepseek-vl-support@latest install --target claude,copilot
+npx @limccn/deepseek-vl-support@latest install --target claude,copilot
 ```
 
 或一次装齐全部 10 个插件客户端：
 
 ```bash
-npx deepseek-vl-support@latest install --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other
+npx @limccn/deepseek-vl-support@latest install --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other
 ```
 
 </details>
@@ -465,7 +465,7 @@ npx deepseek-vl-support@latest install --target copilot,cursor,kiro,openclaw,her
 最快的验证——直接在终端描述一张图片：
 
 ```bash
-npx deepseek-vl-support@latest describe 图片路径.png
+npx @limccn/deepseek-vl-support@latest describe 图片路径.png
 ```
 
 返回一段像样的文字描述 → 一切就绪。之后照常在你的 agent 里读图片，描述会自动送达。
@@ -493,12 +493,12 @@ npx deepseek-vl-support@latest describe 图片路径.png
 
 | 想做什么 | 命令 |
 |---|---|
-| 安装 | `npx deepseek-vl-support@latest install` |
-| 健康检查 | `npx deepseek-vl-support@latest doctor` |
-| 立刻描述一张图片 | `npx deepseek-vl-support@latest describe picture.png` |
-| 查看当前设置 | `npx deepseek-vl-support@latest config get` |
-| 修改设置 | `npx deepseek-vl-support@latest config set maxBytes 5242880` |
-| 卸载 | `npx deepseek-vl-support@latest uninstall` |
+| 安装 | `npx @limccn/deepseek-vl-support@latest install` |
+| 健康检查 | `npx @limccn/deepseek-vl-support@latest doctor` |
+| 立刻描述一张图片 | `npx @limccn/deepseek-vl-support@latest describe picture.png` |
+| 查看当前设置 | `npx @limccn/deepseek-vl-support@latest config get` |
+| 修改设置 | `npx @limccn/deepseek-vl-support@latest config set maxBytes 5242880` |
+| 卸载 | `npx @limccn/deepseek-vl-support@latest uninstall` |
 
 ## 修改设置
 
@@ -513,7 +513,7 @@ npx deepseek-vl-support@latest describe 图片路径.png
 示例——跳过 5 MB 以上的图片：
 
 ```bash
-npx deepseek-vl-support@latest config set maxBytes 5242880
+npx @limccn/deepseek-vl-support@latest config set maxBytes 5242880
 ```
 
 同一张图片描述两次是免费的：结果会缓存在你电脑上（上限 64 MB）。图片改动了就会重新

@@ -24,7 +24,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { backupFile, readTextFile } from "./codex.ts";
-import { MCP_SERVER_NAME, PKG_NAME, SKILL_DIRNAME, SKILL_MARKER } from "./identity.ts";
+import { MCP_SERVER_NAME, PKG_NAME, PLUGIN_GITHUB_SLUG, SKILL_DIRNAME, SKILL_MARKER } from "./identity.ts";
 import { findOnPath } from "./plugin.ts";
 import { packagedSkillPath, templatePath } from "./paths.ts";
 
@@ -554,7 +554,7 @@ function registerPi(opts: SkillAgentOptions, detection: SkillAgentDetection): Sk
       status: "manual",
       detail:
         notDetected +
-        `Prefer the native package: \`pi install npm:${PKG_NAME}\` (or \`pi install git:github.com/limccn/${PKG_NAME}@<tag>\`) — one command gives pi the deepseek-vision skill (user-level, reload-free after restart) and a native extension: pasting an image or reading an image file is described automatically (restart pi after install). ` +
+        `Prefer the native package: \`pi install npm:${PKG_NAME}\` (or \`pi install git:${PLUGIN_GITHUB_SLUG}@<tag>\`) — one command gives pi the deepseek-vision skill (user-level, reload-free after restart) and a native extension: pasting an image or reading an image file is described automatically (restart pi after install). ` +
         `The project-level skill was also written to .agents/skills/deepseek-vision/ (pi loads project skills only after you trust the project on first run; use it for team repos). ` +
         `To get MCP tools on top, install the community extension pi-mcp-adapter (\`pi install npm:pi-mcp-adapter\`, restart pi) and re-run this installer.`,
     };
@@ -620,7 +620,7 @@ function registerOmp(opts: SkillAgentOptions, detection: SkillAgentDetection): S
     ? ""
     : `Oh My Pi not detected — install it first (${NOT_DETECTED_HINTS.omp}). `;
   const guidance =
-    `Prefer the native package: \`omp install npm:${PKG_NAME}\` (or \`omp install github:limccn/${PKG_NAME}@<tag>\`) — one command gives omp the deepseek-vision skill AND automatic MCP tools (the package's .mcp.json is auto-registered; activate with /reload-plugins). ` +
+    `Prefer the native package: \`omp install npm:${PKG_NAME}\` (or \`omp install github:${PLUGIN_GITHUB_SLUG}@<tag>\`) — one command gives omp the deepseek-vision skill AND automatic MCP tools (the package's .mcp.json is auto-registered; activate with /reload-plugins). ` +
     `The project-level skill was also written to .agents/skills/deepseek-vision/ (omp reads it at priority 70 — use it for team repos). ` +
     `No config file is written by this installer (omp user-level MCP config paths are unverified).`;
   return { agent: "omp", status: "ok", detail: notDetected + guidance };
@@ -668,7 +668,7 @@ function registerDsh(opts: SkillAgentOptions, detection: SkillAgentDetection): S
     ? ""
     : `dsh not detected — install it first (${NOT_DETECTED_HINTS.dsh}). `;
   const guidance =
-    `Prefer the native package: \`dsh plugin --profile web add ${PKG_NAME}@latest\` (or \`dsh plugin --profile web add github:limccn/${PKG_NAME}@<tag>\`) — one command gives dsh the describe_image + vision_status native tools, reading the same VISION_* env / config.json chain (restart the dsh web session after install). ` +
+    `Prefer the native package: \`dsh plugin --profile web add ${PKG_NAME}@latest\` (or \`dsh plugin --profile web add github:${PLUGIN_GITHUB_SLUG}@<tag>\`) — one command gives dsh the describe_image + vision_status native tools, reading the same VISION_* env / config.json chain (restart the dsh web session after install). ` +
     `The project-level skill was also written to .agents/skills/deepseek-vision/ (dsh reads it at rank 200 — use it for team repos). ` +
     `Uninstall: \`dsh plugin --profile web remove ${PKG_NAME}\`. ` +
     `Note: dsh skill frontmatter is fail-closed on camelCase keys; our skill uses \`allowed-tools\` (kebab-case) — whether dsh ignores the key needs real-machine verification.`;

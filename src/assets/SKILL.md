@@ -1,7 +1,7 @@
 ---
 # deepseek-vl-support:skill
 name: deepseek-vision
-description: Describe images (screenshots, error screens, UI mockups, charts) in detail when the current model cannot see images. Trigger words: screenshot, image, UI, mockup, chart, error screenshot
+description: Describe images (screenshots, error screens, UI mockups, charts) in detail when the current model cannot see images. Use when the task involves screenshots, images, UI mockups, charts, or error screenshots
 allowed-tools: Bash Read
 ---
 
@@ -23,7 +23,7 @@ text description and reason from it.
 Run in the Bash tool:
 
 ```bash
-npx deepseek-vl-support describe "<image file path>" "<optional question>"
+npx @limccn/deepseek-vl-support describe "<image file path>" "<optional question>"
 ```
 
 or, if the `deepseek-vl-support` bin is on PATH:
@@ -49,6 +49,6 @@ Default prompt: `references/vision-prompt.md`. Overrides (highest wins):
 
 ## Troubleshooting
 
-Run `npx deepseek-vl-support doctor` to check the vision endpoint and model.
+Run `npx @limccn/deepseek-vl-support doctor` to check the vision endpoint and model.
 If images are not described automatically, check `VISION_DISABLE` and the hook
 registration in `.claude/settings.json`.

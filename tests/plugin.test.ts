@@ -117,7 +117,7 @@ test("static compliance: mcp.json is transport-valid, credential-free, and close
   // executable search; the npm package is fetched on first tool call. The
   // user environment is assumed to include npm/npx (deliberate decision
   // 2026-08-14 — see docs/e2e-real-endpoint.md §9.6 for the known risk).
-  assert.deepEqual(args, ["-y", "deepseek-vl-support", "mcp"]);
+  assert.deepEqual(args, ["-y", "@limccn/deepseek-vl-support", "mcp"]);
   assert.ok(!("env" in server), "no env entries (credentials stay in user config)");
   assert.ok(!("headers" in server), "no headers");
   assert.ok(!("cwd" in server), "no cwd — clients use the plugin root by default");
@@ -194,6 +194,11 @@ test("AgentSkills conformance: every deepseek-vision SKILL.md copy follows agent
   assert.equal(name, "deepseek-vision", "name is the skill directory name");
   const description = fm.match(/^description:\s*(.+)$/m)?.[1];
   assert.ok(description && description.length >= 1 && description.length <= 1024, `description 1-1024 chars: ${description?.length}`);
+  // YAML plain-scalar validity: ": " inside the scalar would split a mapping
+  // and strict parsers reject the frontmatter (js-yaml/pyyaml) — rephrase,
+  // never embed "key: value" text in the description
+  assert.ok(!description.includes(": "), `description stays a single YAML plain scalar (no ": " inside): ${description}`);
+  assert.match(description, /screenshot|image|UI|mockup|chart|error/i, "description carries the trigger words");
   const allowed = fm.match(/^allowed-tools:\s*(.+)$/m)?.[1];
   assert.ok(allowed, "allowed-tools present");
   assert.ok(!allowed.includes(","), `allowed-tools must be space-separated (spec), got: "${allowed}"`);
