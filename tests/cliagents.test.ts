@@ -23,7 +23,7 @@ import {
   uninstallCliAgents,
   type CliAgentOptions,
 } from "../src/cliagents.ts";
-import { HOOK_COMMAND_IDENT, HOOK_FILENAME, MCP_SERVER_NAME, PKG_NAME, SKILL_DIRNAME, SKILL_MARKER } from "../src/identity.ts";
+import { HOOK_COMMAND_IDENT, HOOK_FILENAME, MANAGED_MARKER, MCP_SERVER_NAME, PKG_NAME, SKILL_DIRNAME, SKILL_MARKER } from "../src/identity.ts";
 
 let tmp: { base: string; project: string; home: string } | null = null;
 const savedEnv = { ...process.env };
@@ -286,7 +286,7 @@ test("reasonix global: config.toml [[plugins]] block + ~/.agents/skills + home s
     const toml = text(join(reasonixHome(home), "config.toml"));
     assert.ok(toml.includes(`name = "${MCP_SERVER_NAME}"`), "toml block name");
     assert.ok(toml.includes(`command = "npx"`), "toml block command");
-    assert.ok(toml.includes(`${PKG_NAME}:start`) && toml.includes(`${PKG_NAME}:end`), "managed markers");
+    assert.ok(toml.includes(`${MANAGED_MARKER}:start`) && toml.includes(`${MANAGED_MARKER}:end`), "managed markers");
     assert.ok(existsSync(join(home, ".agents", "skills", SKILL_DIRNAME, "SKILL.md")), "global shared skill");
     assert.ok(existsSync(join(reasonixHome(home), "settings.json")), "home settings.json hook");
     assert.ok(existsSync(join(reasonixHome(home), "hooks", HOOK_FILENAME)), "home hook.cjs");
@@ -322,7 +322,10 @@ test("reasonix TOML update: reinstall refreshes an edited managed block", async 
     await installCliAgents(opts, detectCliAgents(home, emptyPathEnv()));
     const updated = text(tomlFile);
     assert.ok(!updated.includes("@0.0.0"), "stale args replaced");
-    assert.equal(updated.split(`${PKG_NAME}:start`).length - 1, 1, "exactly one managed block");
+    assert.equal(updated.split(`${MANAGED_MARKER}:start`).length - 1, 1, "exactly one managed block");
+    // managed-block markers are decoupled from PKG_NAME: the scoped rename
+    // must not orphan old installs' `# deepseek-vl-support:start` blocks
+    assert.ok(!updated.includes(`# ${PKG_NAME}:start`), "marker does not track PKG_NAME (stable across the scoped rename)");
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -333,7 +336,7 @@ test("reasonix uninstall: partial managed block (missing marker) is left untouch
   try {
     const tomlFile = join(reasonixHome(home), "config.toml");
     mkdirSync(join(tomlFile, ".."), { recursive: true });
-    const broken = `# ${PKG_NAME}:start\n[[plugins]]\nname = "x"\n`;
+    const broken = `# ${MANAGED_MARKER}:start\n[[plugins]]\nname = "x"\n`;
     writeFileSync(tomlFile, broken, "utf8");
     const warnings: string[] = [];
     const res = await installCliAgents(

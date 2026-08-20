@@ -11,12 +11,12 @@ model's context. Zero runtime dependencies, Node ≥ 18, MIT. `README.md` is the
 product doc (do not duplicate it here); `docs/README.zh-CN.md` is its Chinese counterpart.
 
 One config feeds **five surfaces**:
-1. `describe` CLI — `npx deepseek-vl-support describe <file> [question] [--json]`
+1. `describe` CLI — `npx @limccn/deepseek-vl-support describe <file> [question] [--json]`
 2. **Claude Code hook** — `dist/hook.cjs` copied to `.claude/hooks/`, wired via
    `PreToolUse(Read)` + `SessionStart` entries in `.claude/settings.json`; a `/vision`
    slash command and a `deepseek-vision` skill are also installed
 3. **MCP server** — `deepseek-vl` stdio server with tools `describe_image` and
-   `vision_status` (launched as `npx -y deepseek-vl-support mcp`)
+   `vision_status` (launched as `npx -y @limccn/deepseek-vl-support mcp`)
 4. **Skill** — `deepseek-vision` Agent Skills product (5 byte-identical copies; see
    AgentSkills conformance below)
 5. **Native plugins** — pi/omp extension (`extensions/deepseek-vision.ts`) and dsh cordis
@@ -55,10 +55,10 @@ node dist/hook.cjs </dev/null            # hook self-contained check → prints 
 npm pack --dry-run                       # tarball manifest check (see Release process)
 ```
 
-Known gotcha: running `npx -y deepseek-vl-support@<ver> …` **inside this repo's own
+Known gotcha: running `npx -y @limccn/deepseek-vl-support@<ver> …` **inside this repo's own
 directory** matches the local package.json, npx skips the download, and cmd reports
 `'deepseek-vl-support' is not recognized` — a run-location artifact. Smoke-test outside the
-package dir (e.g. under `%TEMP%`). A stale global install (`npm ls -g deepseek-vl-support`)
+package dir (e.g. under `%TEMP%`). A stale global install (`npm ls -g @limccn/deepseek-vl-support`)
 can likewise shadow npx and run an OLD version silently.
 
 ## Configuration
@@ -101,7 +101,7 @@ never touches user files lacking our marker.
 | Target | What the installer does |
 |---|---|
 | `claude` | `.claude/settings.json` PreToolUse(Read) + SessionStart entries + hook copy + `/vision` command + skill |
-| `codex` | `.codex/config.toml` MCP section (pins `deepseek-vl-support@<version>`, `tool_timeout_sec = 180`) + AGENTS.md block + `~/.codex/models.json` fix (`supports_search_tool: false` for the DeepSeek entry — a known Codex bug hides MCP tools without it) + project `.agents/skills/` write (project scope only) |
+| `codex` | `.codex/config.toml` MCP section (pins `@limccn/deepseek-vl-support@<version>`, `tool_timeout_sec = 180`) + AGENTS.md block + `~/.codex/models.json` fix (`supports_search_tool: false` for the DeepSeek entry — a known Codex bug hides MCP tools without it) + project `.agents/skills/` write (project scope only) |
 | `opencode` | `opencode.json` `mcp.deepseek-vl` (`type: local`, `npx -y … mcp`) + `.agents/skills/` |
 | `qwen` | `.qwen/skills/deepseek-vision/` + `settings.json` mcpServers + PreToolUse hook (`node "<abs path to hook.cjs>"`); global `~/.qwen/`; a JSONC settings.json is reported manual (bytes untouched) |
 | `reasonix` | `.agents/skills/` + project `.mcp.json` + `.reasonix/settings.json` hook; global writes a `[[plugins]]` block to `~/.reasonix/config.toml` + `~/.agents/skills/` |
@@ -111,12 +111,12 @@ never touches user files lacking our marker.
 
 **Skill agents** (project scope only, never trigger the scope question): `trae`
 (`.trae/skills/deepseek-vision/` + manual import guidance — IDE, no CLI automation),
-`pi` (shared `.agents/skills/` skill; prefers `pi install npm:deepseek-vl-support` — user
+`pi` (shared `.agents/skills/` skill; prefers `pi install npm:@limccn/deepseek-vl-support` — user
 skill + native extension; writes `mcpServers` to `~/.pi/agent/mcp.json` only when the
 pi-mcp-adapter extension is detected), `omp` (shared skill, rank 70; prefers
-`omp install npm:deepseek-vl-support` — skill + auto MCP from `.mcp.json` + extension,
+`omp install npm:@limccn/deepseek-vl-support` — skill + auto MCP from `.mcp.json` + extension,
 activate with `/reload-plugins`), `dsh` (shared skill, rank 200; prefers
-`dsh plugin --profile web add deepseek-vl-support@latest` — native describe_image +
+`dsh plugin --profile web add @limccn/deepseek-vl-support@latest` — native describe_image +
 vision_status tools via cordis patch).
 
 **Plugin clients** (always global; materialize `~/.deepseek-vl/plugin/` = exactly
@@ -150,12 +150,12 @@ skill copies and hooks. Plugin uninstall keeps the materialized dir unless `--pu
 ## Non-interactive / CI install
 
 ```bash
-npx deepseek-vl-support@latest install --non-interactive \
+npx @limccn/deepseek-vl-support@latest install --non-interactive \
   --target claude,codex --preset custom \
   --base-url https://api.moonshot.cn/v1 --model moonshot-v1-32k-vision-preview \
   --api-key sk-... --fallbacks "qwen/qwen2.5-vl-72b-instruct@https://openrouter.ai/api/v1"
 # skip endpoint config entirely:
-npx deepseek-vl-support@latest install --non-interactive --target opencode --preset later
+npx @limccn/deepseek-vl-support@latest install --non-interactive --target opencode --preset later
 ```
 
 `--dry-run` prints what would be written, writes nothing. `--update` refreshes managed
@@ -173,7 +173,7 @@ release in a clean directory. Prereqs: Node ≥ 18, a real OpenAI-compatible end
 
 1. **Clean-room install**: `mkdir -p ~/tmp/dvls-e2e && cd ~/tmp/dvls-e2e && rm -rf project &&
    mkdir project && cd project`, then
-   `npx deepseek-vl-support install --non-interactive --target claude,codex --preset openrouter
+   `npx @limccn/deepseek-vl-support install --non-interactive --target claude,codex --preset openrouter
    --api-key $OPENROUTER_API_KEY`. Verify with `--dry-run` first (predictable); then
    `ls -R .deepseek-vl .claude .codex .gitignore` and confirm `.gitignore` contains `.deepseek-vl/`.
 2. **Config + doctor**: `config get` (key masked); `doctor` → `[OK]` endpoint reachable +
@@ -194,7 +194,7 @@ release in a clean directory. Prereqs: Node ≥ 18, a real OpenAI-compatible end
    Non-interactive `codex exec` needs `--dangerously-bypass-approvals-and-sandbox` and, when
    the project is not in `~/.codex/config.toml` trust list, `-c` MCP overrides
    (`-c 'mcp_servers.deepseek-vl.command="npx"' -c 'mcp_servers.deepseek-vl.args=["-y",
-   "deepseek-vl-support@<ver>", "mcp"]' -c 'mcp_servers.deepseek-vl.tool_timeout_sec=180'`).
+   "@limccn/deepseek-vl-support@<ver>", "mcp"]' -c 'mcp_servers.deepseek-vl.tool_timeout_sec=180'`).
 7. **Fallback chain** (optional): `config set fallbacks '{"model":"Qwen/Qwen2.5-VL-72B-Instruct",
    "baseUrl":"https://api.siliconflow.cn/v1"}'`, break the primary
    (`config set baseUrl http://127.0.0.1:1/v1`), describe → automatic fallback success, restore.
@@ -236,14 +236,17 @@ marketplace shim + uninstall keeps registration, NanoClaw template copy / no sym
   VS Code settings entry behavior on a real machine.
 
 Known risk §9.6 (R3): bare `npx` in `mcp.json`/`.mcp.json` (`command: "npx"`, `args: ["-y",
-"deepseek-vl-support", "mcp"]`) fails with ENOENT when a client spawns MCP stdio with
+"@limccn/deepseek-vl-support", "mcp"]`) fails with ENOENT when a client spawns MCP stdio with
 `shell: false` (raw CreateProcess without PATHEXT on Windows) — decision was to keep bare
 `npx` (documented KNOWN RISK; user env is assumed to have npm/npx). Record per client
 `<client>: npx launch OK` on its real machine.
 
 ## Release process (was docs/releasing.md)
 
-`npm publish` is always manual — never auto-published from automated tasks.
+`npm publish` from this machine is manual; a published GitHub release also triggers the
+dual-publish workflow (`.github/workflows/publish.yml` → npmjs + GitHub Packages).
+**0.2.x unscoped** (`deepseek-vl-support` on npmjs) is a **frozen legacy channel** —
+published only manually (temporary rename → build → publish → revert), never by the workflow.
 
 1. **Version bump**: `npm version <major|minor|patch>`. Four manual version constants must
    match package.json (plugin.test.ts asserts the static files; the src constants are manual):
@@ -269,18 +272,21 @@ Known risk §9.6 (R3): bare `npx` in `mcp.json`/`.mcp.json` (`command: "npx"`, `
    survive the build; `dist/dsh-plugin.js` must keep `@deepseek-ai/dsh-tools` as a bare
    import (the dsh profile closure injects it). Verify `node dist/hook.cjs </dev/null`
    prints `{}` and exits 0.
-4. **Publish**: `npm publish --dry-run` first, then `npm publish` (first publish:
-   `--access public`). On `E403 Two-factor authentication … is required to publish`: the
+4. **Publish**: `npm publish --dry-run` first, then `npm publish --access public`
+   (scoped packages default to private — `--access public` is required on first publish).
+   On `E403 Two-factor authentication … is required to publish`: the
    terminal prompts for a 6-digit OTP and retries; if it still fails, use a granular access
    token with "Bypass two-factor authentication in automated environments" and
-   `npm config set //registry.npmjs.org/:_authToken <token>`.
+   `npm config set //registry.npmjs.org/:_authToken <token>`. GitHub Packages (if used)
+   is published from `.github/workflows/publish.yml` on a release; its first publish
+   defaults to private — flip to public in the package settings page.
 5. **Post-publish smoke** (in a SEPARATE directory outside the package, e.g. under `%TEMP%`):
-   `npx -y deepseek-vl-support@<version> version`, then in a configured project
-   `npx -y deepseek-vl-support@<version> doctor`. Refresh a stale global install
-   (`npm i -g deepseek-vl-support@latest`) — it can silently shadow npx and run an old
-   version with plausible output.
+   `npx -y @limccn/deepseek-vl-support@<version> version`, then in a configured project
+   `npx -y @limccn/deepseek-vl-support@<version> doctor`. Refresh a stale global install
+   (`npm i -g @limccn/deepseek-vl-support@latest`) — it can silently shadow npx and run an
+   old version with plausible output.
 
-**Rollback**: npm cannot delete versions — `npm deprecate deepseek-vl-support@<ver> "broken —
+**Rollback**: npm cannot delete versions — `npm deprecate @limccn/deepseek-vl-support@<ver> "broken —
 use <new-version> instead"`. Installer writes `.bak` backups before every write; `uninstall`
 reverses by marker; config/cache are kept so reinstalling restores. Codex's config.toml MCP
 section pins the version — after upgrading, re-run `install --update` to refresh it.

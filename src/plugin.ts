@@ -28,9 +28,9 @@ import {
   CURSOR_PLUGIN_DIRNAME,
   CURSOR_PLUGIN_MARKER,
   CURSOR_PLUGIN_MARKER_FILE,
-  PKG_NAME,
   PLUGIN_DIRNAME,
   PLUGIN_GITHUB_SLUG,
+  PLUGIN_NAME,
   PLUGIN_REPO,
 } from "./identity.ts";
 
@@ -438,7 +438,7 @@ function copilotEntryAdded(data: Record<string, unknown>): boolean {
 function copilotEntryRemoved(data: Record<string, unknown>): number {
   const arr = data[COPILOT_ENABLED_PLUGINS_KEY];
   if (!Array.isArray(arr)) return 0;
-  const kept = arr.filter((e) => !(typeof e === "string" && e.includes(PKG_NAME)));
+  const kept = arr.filter((e) => !(typeof e === "string" && e.includes(PLUGIN_NAME)));
   const removed = arr.length - kept.length;
   if (removed === 0) return 0;
   if (kept.length) data[COPILOT_ENABLED_PLUGINS_KEY] = kept;
@@ -513,7 +513,7 @@ async function registerCopilot(
     };
   }
   const list = await runCmd(bin, ["plugin", "list"], { env: opts.env });
-  if (list.code === 0 && list.stdout.includes(PKG_NAME)) {
+  if (list.code === 0 && list.stdout.includes(PLUGIN_NAME)) {
     return {
       client: "copilot",
       status: "ok",
@@ -568,7 +568,7 @@ async function unregisterCopilot(
     } else {
       const removed = copilotEntryRemoved(settings.data);
       if (removed === 0) {
-        notes.push(`no ${PKG_NAME} entries in ${file}`);
+        notes.push(`no ${PLUGIN_NAME} entries in ${file}`);
       } else if (opts.dryRun) {
         notes.push(`[dry-run] would remove ${removed} enabledPlugins entr(y/ies) from ${file}`);
       } else {
@@ -805,7 +805,7 @@ function unregisterVscode(opts: PluginClientOptions): PluginClientResult {
 // shim OUTSIDE the materialized plugin dir: ~/.deepseek-vl/marketplace/,
 // which carries a copy of the plugin. The materialized dir keeps exactly its
 // 4 spec entries.
-const CODEX_MARKETPLACE_NAME = PKG_NAME;
+const CODEX_MARKETPLACE_NAME = PLUGIN_NAME;
 
 /** Local marketplace shim root for the codex CLI: ~/.deepseek-vl/marketplace/. */
 export function codexMarketplaceDir(home: string): string {
@@ -829,7 +829,7 @@ function writeCodexMarketplaceShim(opts: PluginClientOptions): { manifest: strin
         owner: { name: PLUGIN_GITHUB_SLUG.split("/")[0] },
         plugins: [
           {
-            name: PKG_NAME,
+            name: PLUGIN_NAME,
             source: { source: "local", path: "./plugin" },
             policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
             category: "development",
@@ -850,7 +850,7 @@ async function registerChatGptCodex(
 ): Promise<PluginClientResult> {
   const bin = detection.bin;
   const shimRoot = codexMarketplaceDir(opts.home);
-  const pluginRef = `${PKG_NAME}@${CODEX_MARKETPLACE_NAME}`;
+  const pluginRef = `${PLUGIN_NAME}@${CODEX_MARKETPLACE_NAME}`;
   // Write the local marketplace shim BEFORE the CLI check: the manual path
   // (ChatGPT desktop app, no codex CLI) points the user at shimRoot, so the
   // marketplace dir must exist for those instructions to be actionable.
@@ -873,7 +873,7 @@ async function registerChatGptCodex(
     };
   }
   const list = await runCmd(bin, ["plugin", "list"], { env: opts.env });
-  if (list.code === 0 && list.stdout.includes(PKG_NAME)) {
+  if (list.code === 0 && list.stdout.includes(PLUGIN_NAME)) {
     return {
       client: "chatgpt-codex",
       status: "ok",
@@ -908,7 +908,7 @@ async function unregisterChatGptCodex(
   detection: PluginClientDetection,
 ): Promise<PluginClientResult> {
   const notes: string[] = [];
-  const pluginRef = `${PKG_NAME}@${CODEX_MARKETPLACE_NAME}`;
+  const pluginRef = `${PLUGIN_NAME}@${CODEX_MARKETPLACE_NAME}`;
   if (detection.bin === null) {
     notes.push("codex CLI not found (skipping CLI uninstall)");
   } else if (opts.dryRun) {
@@ -952,7 +952,7 @@ async function registerGrok(
     return { client: "grok", status: "ok", detail: `[dry-run] would run: grok plugin install ${opts.pluginDir} --trust` };
   }
   const list = await runCmd(bin, ["plugin", "list"], { env: opts.env });
-  if (list.code === 0 && list.stdout.includes(PKG_NAME)) {
+  if (list.code === 0 && list.stdout.includes(PLUGIN_NAME)) {
     return { client: "grok", status: "ok", detail: `already installed (${bin} plugin list) — idempotent, no change` };
   }
   const install = await runCmd(bin, ["plugin", "install", opts.pluginDir, "--trust"], { env: opts.env });
@@ -1019,8 +1019,8 @@ async function registerNanoClaw(
   const bin = detection.bin;
   const env = opts.env ?? process.env;
   const templatesDir = nanoclawTemplatesDir(opts.home, env);
-  const templateDest = join(templatesDir, PKG_NAME);
-  const stamp = `ncl groups create --template ${PKG_NAME} --name "${NANOCLAW_GROUP_NAME}"`;
+  const templateDest = join(templatesDir, PLUGIN_NAME);
+  const stamp = `ncl groups create --template ${PLUGIN_NAME} --name "${NANOCLAW_GROUP_NAME}"`;
   if (bin === null) {
     return {
       client: "nanoclaw",
@@ -1040,7 +1040,7 @@ async function registerNanoClaw(
   mkdirSync(templatesDir, { recursive: true });
   cpSync(opts.pluginDir, templateDest, { recursive: true, force: true });
   const stampEnv = { ...env, [NANOCLAW_TEMPLATES_ENV]: templatesDir };
-  const r = await runCmd(bin, ["groups", "create", "--template", PKG_NAME, "--name", NANOCLAW_GROUP_NAME], { env: stampEnv });
+  const r = await runCmd(bin, ["groups", "create", "--template", PLUGIN_NAME, "--name", NANOCLAW_GROUP_NAME], { env: stampEnv });
   if (r.code !== 0) {
     return {
       client: "nanoclaw",
@@ -1063,8 +1063,8 @@ function unregisterNanoClaw(opts: PluginClientOptions): PluginClientResult {
     client: "nanoclaw",
     status: "manual",
     detail:
-      `NanoClaw has no plugin uninstall. Manual: delete the stamped group in the NanoClaw app (or restamp with \`ncl groups create --template ${PKG_NAME} --yes\` + \`ncl groups restart --id <group-id>\`). ` +
-      `The template copy (${join(nanoclawTemplatesDir(opts.home, opts.env ?? process.env), PKG_NAME)}) stays unless you pass --purge-config.`,
+      `NanoClaw has no plugin uninstall. Manual: delete the stamped group in the NanoClaw app (or restamp with \`ncl groups create --template ${PLUGIN_NAME} --yes\` + \`ncl groups restart --id <group-id>\`). ` +
+      `The template copy (${join(nanoclawTemplatesDir(opts.home, opts.env ?? process.env), PLUGIN_NAME)}) stays unless you pass --purge-config.`,
   };
 }
 
@@ -1137,7 +1137,7 @@ async function registerOpenClaw(
     };
   }
   const list = await runCmd(bin, ["plugins", "list"], { env: opts.env });
-  if (list.code === 0 && list.stdout.includes(PKG_NAME)) {
+  if (list.code === 0 && list.stdout.includes(PLUGIN_NAME)) {
     return {
       client: "openclaw",
       status: "ok",
@@ -1220,7 +1220,7 @@ async function registerHermes(
     };
   }
   const list = await runCmd(bin, ["plugins", "list"], { env: opts.env });
-  if (list.code === 0 && list.stdout.includes(PKG_NAME)) {
+  if (list.code === 0 && list.stdout.includes(PLUGIN_NAME)) {
     const enable = await runCmd(bin, ["plugins", "enable", "deepseek-vl-support"], { env: opts.env });
     const extra = enable.code === 0 ? "enabled" : `enable failed (warning): ${trimErr(enable.stderr || enable.stdout)}`;
     return {

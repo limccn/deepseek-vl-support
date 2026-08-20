@@ -3,10 +3,10 @@
 // dsh cordis plugin via tools.ts).
 // stdout carries ONLY protocol messages; everything else goes to stderr.
 import { createInterface } from "node:readline";
-import { PKG_NAME } from "./identity.ts";
+import { PLUGIN_NAME } from "./identity.ts";
 import { callDescribeImage, callVisionStatus, describeImageSchema, visionStatusSchema } from "./tools.ts";
 
-const SERVER_VERSION = "0.2.9";
+const SERVER_VERSION = "0.3.0";
 const PROTOCOL_VERSION = "2024-11-05";
 
 interface JsonRpcRequest {
@@ -44,7 +44,7 @@ async function handleRequest(req: JsonRpcRequest): Promise<void> {
     resultResponse(id, {
       protocolVersion: typeof clientVersion === "string" && clientVersion ? clientVersion : PROTOCOL_VERSION,
       capabilities: { tools: {} },
-      serverInfo: { name: PKG_NAME, version: SERVER_VERSION },
+      serverInfo: { name: PLUGIN_NAME, version: SERVER_VERSION },
     });
     return;
   }

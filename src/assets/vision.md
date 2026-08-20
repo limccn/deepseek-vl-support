@@ -14,7 +14,7 @@ $ARGUMENTS:
 Run the vision diagnostics command and report the results:
 
 ```bash
-npx deepseek-vl-support doctor $ARGUMENTS
+npx @limccn/deepseek-vl-support doctor $ARGUMENTS
 ```
 
 Report: whether the vision endpoint is reachable, whether the configured

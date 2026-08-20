@@ -117,7 +117,7 @@ test("static compliance: mcp.json is transport-valid, credential-free, and close
   // executable search; the npm package is fetched on first tool call. The
   // user environment is assumed to include npm/npx (deliberate decision
   // 2026-08-14 — see docs/e2e-real-endpoint.md §9.6 for the known risk).
-  assert.deepEqual(args, ["-y", "deepseek-vl-support", "mcp"]);
+  assert.deepEqual(args, ["-y", "@limccn/deepseek-vl-support", "mcp"]);
   assert.ok(!("env" in server), "no env entries (credentials stay in user config)");
   assert.ok(!("headers" in server), "no headers");
   assert.ok(!("cwd" in server), "no cwd — clients use the plugin root by default");

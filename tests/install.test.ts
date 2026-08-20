@@ -308,7 +308,7 @@ test("codex install: MCP section + AGENTS.md block + models.json fix, preserving
       const toml = text(join(codexDir, "config.toml"));
       assert.match(toml, /\[mcp_servers\.deepseek-vl\]/);
       assert.match(toml, /command = "npx"/);
-      assert.match(toml, /deepseek-vl-support@0\.\d+\.\d+/);
+      assert.match(toml, /@limccn\/deepseek-vl-support@0\.\d+\.\d+/);
       assert.match(toml, /args = \["-y", "[^"]*", "mcp"\]/);
       assert.match(toml, /tool_timeout_sec = 180/);
       assert.ok(toml.includes('wire_api = "chat"'), "user config.toml content preserved");

@@ -51,7 +51,7 @@ Open a terminal in **your project folder** and run:
 
 ```bash
 cd path/to/your/project
-npx deepseek-vl-support@latest install
+npx @limccn/deepseek-vl-support@latest install
 ```
 
 That's the whole install — the wizard auto-detects the agents on your machine and asks 7
@@ -64,7 +64,7 @@ When it finishes, **restart your session** — the installer prints this reminde
 required for the effect to kick in. Optional check:
 
 ```bash
-npx deepseek-vl-support@latest doctor    # look for [OK]
+npx @limccn/deepseek-vl-support@latest doctor    # look for [OK]
 ```
 
 Re-running on the same project? It asks whether to keep your current settings — Enter
@@ -79,7 +79,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 ```
 
 After a GitHub install, configure the vision endpoint once with
-`npx deepseek-vl-support@latest install --target <your agent>` (or environment variables —
+`npx @limccn/deepseek-vl-support@latest install --target <your agent>` (or environment variables —
 see [Changing settings](#changing-settings)).
 
 ### One-command install per agent
@@ -92,7 +92,7 @@ yours:
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target claude
+npx @limccn/deepseek-vl-support@latest install --target claude
 ```
 
 **2. After install** — restart your session, then read any picture: the description
@@ -110,7 +110,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target codex
+npx @limccn/deepseek-vl-support@latest install --target codex
 ```
 
 **3. After install** — restart Codex, then ask it to describe a picture.
@@ -122,7 +122,7 @@ npx deepseek-vl-support@latest install --target codex
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target opencode
+npx @limccn/deepseek-vl-support@latest install --target opencode
 ```
 
 **2. After install** — restart OpenCode.
@@ -134,7 +134,7 @@ npx deepseek-vl-support@latest install --target opencode
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target trae
+npx @limccn/deepseek-vl-support@latest install --target trae
 ```
 
 **2. After install** — import the skill once: Settings → Rules & Skills → Create/Import.
@@ -146,12 +146,12 @@ npx deepseek-vl-support@latest install --target trae
 
 **1. Native install (recommended)** — skill + extension in one command
 ```bash
-pi install npm:deepseek-vl-support
+pi install npm:@limccn/deepseek-vl-support
 ```
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target pi
+npx @limccn/deepseek-vl-support@latest install --target pi
 ```
 
 **3. After install** — restart Pi.
@@ -163,12 +163,12 @@ npx deepseek-vl-support@latest install --target pi
 
 **1. Native install (recommended)**
 ```bash
-omp install npm:deepseek-vl-support
+omp install npm:@limccn/deepseek-vl-support
 ```
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target omp
+npx @limccn/deepseek-vl-support@latest install --target omp
 ```
 
 **3. After install** — run `/reload-plugins` (no restart needed).
@@ -180,12 +180,12 @@ npx deepseek-vl-support@latest install --target omp
 
 **1. Native install (recommended)** — in-process tools, no subprocess
 ```bash
-dsh plugin --profile web add deepseek-vl-support@latest
+dsh plugin --profile web add @limccn/deepseek-vl-support@latest
 ```
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target dsh
+npx @limccn/deepseek-vl-support@latest install --target dsh
 ```
 
 **3. After install** — restart the dsh web session.
@@ -197,7 +197,7 @@ npx deepseek-vl-support@latest install --target dsh
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target qwen
+npx @limccn/deepseek-vl-support@latest install --target qwen
 ```
 
 **2. After install** — restart Qwen Code.
@@ -209,7 +209,7 @@ npx deepseek-vl-support@latest install --target qwen
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target reasonix
+npx @limccn/deepseek-vl-support@latest install --target reasonix
 ```
 
 **2. After install** — restart Reasonix.
@@ -221,7 +221,7 @@ npx deepseek-vl-support@latest install --target reasonix
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target kilo
+npx @limccn/deepseek-vl-support@latest install --target kilo
 ```
 
 **2. After install** — restart Kilo Code.
@@ -233,7 +233,7 @@ npx deepseek-vl-support@latest install --target kilo
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target workbuddy
+npx @limccn/deepseek-vl-support@latest install --target workbuddy
 ```
 
 **2. After install** — restart WorkBuddy.
@@ -245,7 +245,7 @@ npx deepseek-vl-support@latest install --target workbuddy
 
 **1. Install**
 ```bash
-npx deepseek-vl-support@latest install --target devin
+npx @limccn/deepseek-vl-support@latest install --target devin
 ```
 
 **2. After install** — restart Devin. (Devin's CLI has no official npm package — download
@@ -263,7 +263,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target copilot
+npx @limccn/deepseek-vl-support@latest install --target copilot
 ```
 
 **3. After install** — check `copilot plugin list`.
@@ -280,7 +280,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target cursor
+npx @limccn/deepseek-vl-support@latest install --target cursor
 ```
 
 **3. After install** — reload the window (Developer → Reload Window).
@@ -297,7 +297,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target kiro
+npx @limccn/deepseek-vl-support@latest install --target kiro
 ```
 
 **3. After install** — import once: Kiro → Powers → Add Custom Power → Import from folder
@@ -315,7 +315,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target openclaw
+npx @limccn/deepseek-vl-support@latest install --target openclaw
 ```
 
 **3. After install** — restart the gateway, verify with `openclaw plugins list`.
@@ -332,7 +332,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target hermes
+npx @limccn/deepseek-vl-support@latest install --target hermes
 ```
 
 **3. After install** — verify with `hermes plugins list`.
@@ -349,7 +349,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target vscode
+npx @limccn/deepseek-vl-support@latest install --target vscode
 ```
 
 **3. After install** — reload the window.
@@ -366,7 +366,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target chatgpt-codex
+npx @limccn/deepseek-vl-support@latest install --target chatgpt-codex
 ```
 
 **3. After install** — start a new Codex thread or ChatGPT session.
@@ -383,7 +383,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target grok
+npx @limccn/deepseek-vl-support@latest install --target grok
 ```
 
 **3. After install** — press `r` in the Plugins tab or start a new session.
@@ -400,7 +400,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target nanoclaw
+npx @limccn/deepseek-vl-support@latest install --target nanoclaw
 ```
 
 **3. After install** — run `ncl wirings create` per the printed guidance.
@@ -417,7 +417,7 @@ Install the plugin from https://github.com/limccn/deepseek-vl-support and enable
 
 **2. Or install via npx**
 ```bash
-npx deepseek-vl-support@latest install --target other
+npx @limccn/deepseek-vl-support@latest install --target other
 ```
 
 </details>
@@ -428,13 +428,13 @@ npx deepseek-vl-support@latest install --target other
 Any combination works, comma-separated:
 
 ```bash
-npx deepseek-vl-support@latest install --target claude,copilot
+npx @limccn/deepseek-vl-support@latest install --target claude,copilot
 ```
 
 Or all 10 plugin clients in one run:
 
 ```bash
-npx deepseek-vl-support@latest install --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other
+npx @limccn/deepseek-vl-support@latest install --target copilot,cursor,kiro,openclaw,hermes,vscode,chatgpt-codex,grok,nanoclaw,other
 ```
 
 </details>
@@ -471,7 +471,7 @@ All supported agents at a glance:
 Fastest check — describe a picture directly in the terminal:
 
 ```bash
-npx deepseek-vl-support@latest describe path/to/a/picture.png
+npx @limccn/deepseek-vl-support@latest describe path/to/a/picture.png
 ```
 
 A good text description comes back → everything is wired up. From then on, just read
@@ -501,12 +501,12 @@ you configure manually:
 
 | What you want | Command |
 |---|---|
-| Install | `npx deepseek-vl-support@latest install` |
-| Health check | `npx deepseek-vl-support@latest doctor` |
-| Describe a picture now | `npx deepseek-vl-support@latest describe picture.png` |
-| See current settings | `npx deepseek-vl-support@latest config get` |
-| Change a setting | `npx deepseek-vl-support@latest config set maxBytes 5242880` |
-| Remove the tool | `npx deepseek-vl-support@latest uninstall` |
+| Install | `npx @limccn/deepseek-vl-support@latest install` |
+| Health check | `npx @limccn/deepseek-vl-support@latest doctor` |
+| Describe a picture now | `npx @limccn/deepseek-vl-support@latest describe picture.png` |
+| See current settings | `npx @limccn/deepseek-vl-support@latest config get` |
+| Change a setting | `npx @limccn/deepseek-vl-support@latest config set maxBytes 5242880` |
+| Remove the tool | `npx @limccn/deepseek-vl-support@latest uninstall` |
 
 ## Changing settings
 
@@ -521,7 +521,7 @@ you never need to touch it. The two settings worth knowing:
 Example — skip pictures over 5 MB:
 
 ```bash
-npx deepseek-vl-support@latest config set maxBytes 5242880
+npx @limccn/deepseek-vl-support@latest config set maxBytes 5242880
 ```
 
 Describing the same picture twice is free: results are cached on your machine (64 MB
