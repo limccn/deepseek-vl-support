@@ -14,3 +14,9 @@ AGENTS.md
 package-lock.json
 
 .trellis/
+
+# hygiene: never commit local registry routing or publish artifacts
+.npmrc
+*.tgz
+*.tsbuildinfo
+coverage/
