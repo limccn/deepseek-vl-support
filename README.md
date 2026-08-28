@@ -45,6 +45,33 @@ OpenCode, Trae, Qwen Code, and 14 more.
    for it once and stores it only on your computer.
 3. **Your AI agent installed** — any of the supported ones below.
 
+## 0.2.x → 0.3.0: what changed, and how to migrate
+
+Version 0.3.0 moves the npm package to a scoped name and publishes it to **both**
+npmjs and GitHub Packages. Your settings, cache, skill files, and the CLI command
+are **unchanged** — only the package reference moves.
+
+| | 0.2.x | 0.3.0 |
+|---|---|---|
+| npm package | `deepseek-vl-support` | `@limccn/deepseek-vl-support` |
+| CLI command | `deepseek-vl-support` | unchanged |
+| config / cache / markers | — | fully compatible, kept as-is |
+| install source | npmjs only (frozen) | npmjs **and** GitHub Packages |
+
+**Already on 0.2.x?** Migrate with a single command — it refreshes every
+managed reference (hook, MCP configs, npx pins) to the scoped name and keeps
+your config and cache:
+
+```bash
+npx @limccn/deepseek-vl-support@latest install --update
+```
+
+Then verify with `npx @limccn/deepseek-vl-support doctor`.
+
+Notes: the 0.2.x `deepseek-vl-support` package stays on npmjs (frozen — no
+further updates, safe to keep installed); the two versions' config files never
+conflict, so old and new installs can coexist.
+
 ## Quick install wizard
 
 Open a terminal in **your project folder** and run:

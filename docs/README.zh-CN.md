@@ -41,6 +41,30 @@ VS Code、OpenCode、Trae、Qwen Code 等 22 种。
    只问一次，并且只存在你自己的电脑上。
 3. **已经装好你的 AI 工具** —— 下面任意一种。
 
+## 0.2.x → 0.3.0：变化了什么，如何迁移
+
+0.3.0 起 npm 包改用 scoped 名，并同时发布到 **npmjs 与 GitHub Packages**
+两个源。你的配置、缓存、技能文件、CLI 命令**全部不变** —— 只有包引用变了。
+
+| | 0.2.x | 0.3.0 |
+|---|---|---|
+| npm 包名 | `deepseek-vl-support` | `@limccn/deepseek-vl-support` |
+| CLI 命令 | `deepseek-vl-support` | 不变 |
+| 配置 / 缓存 / 标记 | — | 完全兼容，原样保留 |
+| 安装来源 | 仅 npmjs（已冻结）| npmjs **和** GitHub Packages |
+
+**已经装了 0.2.x？** 一条命令完成迁移 —— 它会把所有托管引用（hook、
+MCP 配置、npx 版本钉扎）刷新为 scoped 名，配置与缓存保留不动：
+
+```bash
+npx @limccn/deepseek-vl-support@latest install --update
+```
+
+然后用 `npx @limccn/deepseek-vl-support doctor` 验证。
+
+注意：0.2.x 的 `deepseek-vl-support` 包继续留在 npmjs（冻结 —— 不再更新，
+留着无害）；两个版本的配置文件互不冲突，新旧安装可以并存。
+
 ## 快速安装向导
 
 在**你的项目文件夹**里打开终端，运行：
