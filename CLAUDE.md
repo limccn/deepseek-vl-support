@@ -285,8 +285,14 @@ published only manually (temporary rename → build → publish → revert), nev
    terminal prompts for a 6-digit OTP and retries; if it still fails, use a granular access
    token with "Bypass two-factor authentication in automated environments" and
    `npm config set //registry.npmjs.org/:_authToken <token>`. GitHub Packages (if used)
-   is published from `.github/workflows/publish.yml` on a release; its first publish
-   defaults to private — flip to public in the package settings page.
+   is published from `.github/workflows/publish.yml` on a release. Verified 2026-08-28:
+   packages published by Actions/GITHUB_TOKEN into a PUBLIC repo are public from the
+   first publish (anonymous `npm view --registry=https://npm.pkg.github.com` succeeds);
+   a first publish via a PAT/user token still defaults to private — flip in the package
+   settings page. Note npm quirk: the FIRST version ever published to a package gets
+   `latest` even when `--tag rc` is used — the first stable publish with `--tag latest`
+   overwrites it, so an rc round must be followed by the stable round before telling
+   users to install `@latest`.
 5. **Post-publish smoke** (in a SEPARATE directory outside the package, e.g. under `%TEMP%`):
    `npx -y @limccn/deepseek-vl-support@<version> version`, then in a configured project
    `npx -y @limccn/deepseek-vl-support@<version> doctor`. Refresh a stale global install
