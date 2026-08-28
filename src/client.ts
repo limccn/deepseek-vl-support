@@ -214,7 +214,7 @@ async function runDescribe(
     .join("\n");
   throw new Error(
     `vision failed on all ${failures.length} attempt(s):\n${chain}\n` +
-      `Run \`npx deepseek-vl-support doctor\` for diagnosis.`,
+      `Run \`npx @limccn/deepseek-vl-support doctor\` for diagnosis.`,
   );
 }
 

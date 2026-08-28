@@ -906,7 +906,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallReport> {
     report.output.push(...doctor.lines);
     if (!doctor.ok) {
       report.warnings.push(
-        `doctor found problems (see above). Run \`npx deepseek-vl-support doctor\` after fixing.`,
+        `doctor found problems (see above). Run \`npx @limccn/deepseek-vl-support doctor\` after fixing.`,
       );
     }
   }

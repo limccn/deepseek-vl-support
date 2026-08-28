@@ -1,0 +1,77 @@
+# Dual-publish workflow: every published GitHub release pushes
+# @limccn/deepseek-vl-support to BOTH npmjs and GitHub Packages.
+# The repo package.json is permanently scoped (0.3.0+), so neither job
+# needs an `npm pkg set` — the tarball's name is correct by construction.
+#
+# Idempotency: each job first checks whether its registry already has the
+# version; if so it prints a notice and exits 0 (skip, not failure). This
+# lets a release follow a manual `npm publish` without E403 conflicts.
+#
+# Prerelease tagging: versions containing "-" (e.g. 0.3.0-rc1) publish to
+# the `rc` dist-tag so stable installs (`npm i @limccn/deepseek-vl-support`)
+# never resolve to a release candidate; stable versions get `latest`.
+#
+# GitHub Packages visibility: packages published by Actions with
+# GITHUB_TOKEN into a PUBLIC repo inherit the repo's visibility (public) —
+# verified 2026-08-28 with 0.3.0-rc1 (anonymous npm view succeeds).
+# A first publish via a PAT/user token defaults to PRIVATE; flip it to
+# public in the package settings page in that case.
+#
+# Note: `npm install` (not `npm ci`) — package-lock.json is deliberately
+# NOT committed in this repo (see .gitignore).
+name: Publish scoped package
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-npmjs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+      - run: npm install
+      - run: npm run build
+      - name: Publish (skip if version already on npmjs)
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          TAG=$(printf '%s' "$VER" | grep -q -- '-' && echo rc || echo latest)
+          if npm view "@limccn/deepseek-vl-support@$VER" version >/dev/null 2>&1; then
+            echo "::notice::@limccn/deepseek-vl-support@$VER already on npmjs — skipping"
+            exit 0
+          fi
+          npm publish --access public --tag "$TAG"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-github-packages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: "@limccn"
+      - run: npm install
+      - run: npm run build
+      - name: Publish (skip if version already on GitHub Packages)
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          if npm view "@limccn/deepseek-vl-support@$VER" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "::notice::@limccn/deepseek-vl-support@$VER already on GitHub Packages — skipping"
+            exit 0
+          fi
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
