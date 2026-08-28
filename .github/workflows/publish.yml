@@ -11,9 +11,11 @@
 # the `rc` dist-tag so stable installs (`npm i @limccn/deepseek-vl-support`)
 # never resolve to a release candidate; stable versions get `latest`.
 #
-# GitHub Packages: the first publish defaults to PRIVATE — flip it to
-# public in the package settings page (Actions `--access public` is not
-# documented for GH Packages; UI is authoritative).
+# GitHub Packages visibility: packages published by Actions with
+# GITHUB_TOKEN into a PUBLIC repo inherit the repo's visibility (public) —
+# verified 2026-08-28 with 0.3.0-rc1 (anonymous npm view succeeds).
+# A first publish via a PAT/user token defaults to PRIVATE; flip it to
+# public in the package settings page in that case.
 #
 # Note: `npm install` (not `npm ci`) — package-lock.json is deliberately
 # NOT committed in this repo (see .gitignore).

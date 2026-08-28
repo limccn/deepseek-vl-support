@@ -20,7 +20,7 @@ import {
 } from "./config.ts";
 import type { VisionConfig } from "./config.ts";
 
-const VERSION = "0.3.0-rc1";
+const VERSION = "0.3.0";
 
 interface ParsedArgs {
   flags: Map<string, string>;
