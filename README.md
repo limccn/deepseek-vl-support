@@ -109,6 +109,22 @@ After a GitHub install, configure the vision endpoint once with
 `npx @limccn/deepseek-vl-support@latest install --target <your agent>` (or environment variables —
 see [Changing settings](#changing-settings)).
 
+### Skill-only install (Agent Skills CLI)
+
+Just want the `deepseek-vision` skill — no hook, no MCP server? The repo ships it in
+the standard Agent Skills layout (`skills/deepseek-vision/`), so the ecosystem CLI
+works as-is:
+
+```bash
+npx skills add https://github.com/limccn/deepseek-vl-support
+```
+
+This installs the skill to `.agents/skills/deepseek-vision/` (universal, with
+`references/`), symlinked for detected agents such as Claude Code. It's the same
+skill the wizard installs. Configure the vision endpoint once before first use
+(environment variables, or `npx @limccn/deepseek-vl-support@latest install --target
+<your agent>` — see [Changing settings](#changing-settings)).
+
 ### One-command install per agent
 
 Everything below is equivalent to the wizard above — just narrowed to one agent. Pick

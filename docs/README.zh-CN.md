@@ -101,6 +101,21 @@ npx @limccn/deepseek-vl-support@latest install --target <你的agent>
 ```
 （或环境变量，见[修改设置](#修改设置)）配置一次看图服务即可。
 
+### 仅安装技能（Agent Skills CLI）
+
+只想要 `deepseek-vision` 技能——不要 hook、不要 MCP server？仓库以标准 Agent Skills
+布局（`skills/deepseek-vision/`）发布，生态 CLI 直接可用：
+
+```bash
+npx skills add https://github.com/limccn/deepseek-vl-support
+```
+
+技能会装到 `.agents/skills/deepseek-vision/`（通用路径，含 `references/`），
+并为检测到的 agent（如 Claude Code）建符号链接。它与向导安装的是同一个技能。
+首次使用前先配置一次看图服务（环境变量，或
+`npx @limccn/deepseek-vl-support@latest install --target <你的agent>`，见
+[修改设置](#修改设置)）。
+
 ### 每种 agent 的一键安装
 
 下面每条命令与上面的向导等价——只是只针对某一个 agent。找到你的：
