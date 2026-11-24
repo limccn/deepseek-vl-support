@@ -116,13 +116,34 @@ the standard Agent Skills layout (`skills/deepseek-vision/`), so the ecosystem C
 works as-is:
 
 ```bash
-npx skills add https://github.com/limccn/deepseek-vl-support
+npx skills add limccn/deepseek-vl-support --skill deepseek-vision -y
 ```
 
-This installs the skill to `.agents/skills/deepseek-vision/` (universal, with
-`references/`), symlinked for detected agents such as Claude Code. It's the same
-skill the wizard installs. Configure the vision endpoint once before first use
-(environment variables, or `npx @limccn/deepseek-vl-support@latest install --target
+`--skill` picks the one skill in this repo; drop `-y` to choose interactively. This path
+needs **Node ≥ 22.20** — that is the CLI's requirement, not this package's (which needs
+≥ 18).
+
+Where it lands depends on how many agents the CLI detects: a single agent gets a copy in
+its own directory (e.g. `.claude/skills/deepseek-vision/`); two or more get the universal
+`.agents/skills/deepseek-vision/` plus per-agent symlinks. With `-g` the same happens
+under your home directory instead of the project. Either way `references/` comes along,
+and the CLI records the install in `skills-lock.json` (project — commit it) or
+`~/.agents/.skill-lock.json` (global).
+
+Remove it with:
+
+```bash
+npx skills remove deepseek-vision
+```
+
+> **Heads-up:** `skills remove` matches by name and does not consult the lockfile, so it
+> also deletes a copy placed by this package's own installer. If you have used both
+> install paths, prefer `npx @limccn/deepseek-vl-support@latest uninstall`, or
+> `skills remove --all`, which on 1.9.0 only clears skills the CLI itself installed.
+
+Two naming traps: `skills install` is **not** the install command (it restores from the
+lockfile), and there is no `uninstall`. Configure the vision endpoint once before first
+use (environment variables, or `npx @limccn/deepseek-vl-support@latest install --target
 <your agent>` — see [Changing settings](#changing-settings)).
 
 ### One-command install per agent

@@ -107,12 +107,31 @@ npx @limccn/deepseek-vl-support@latest install --target <你的agent>
 布局（`skills/deepseek-vision/`）发布，生态 CLI 直接可用：
 
 ```bash
-npx skills add https://github.com/limccn/deepseek-vl-support
+npx skills add limccn/deepseek-vl-support --skill deepseek-vision -y
 ```
 
-技能会装到 `.agents/skills/deepseek-vision/`（通用路径，含 `references/`），
-并为检测到的 agent（如 Claude Code）建符号链接。它与向导安装的是同一个技能。
-首次使用前先配置一次看图服务（环境变量，或
+`--skill` 指定本仓库里的这一个技能；去掉 `-y` 可交互选择。这条路径要求
+**Node ≥ 22.20**——这是该 CLI 自身的要求，本包只需 ≥ 18，两者不要混为一谈。
+
+装到哪里取决于 CLI 检测到几个 agent：只有一个 agent 时直接复制到它自己的目录
+（如 `.claude/skills/deepseek-vision/`）；两个及以上才使用通用路径
+`.agents/skills/deepseek-vision/` 并为各 agent 建符号链接。加 `-g` 则装到用户主目录
+而非当前项目。两种情况都会带上 `references/`，且 CLI 会把安装记录写进
+`skills-lock.json`（项目级，建议提交）或 `~/.agents/.skill-lock.json`（全局）。
+
+卸载用：
+
+```bash
+npx skills remove deepseek-vision
+```
+
+> **注意：** `skills remove` 按名字匹配、不查 lockfile，所以它也会删掉由本包安装器
+> 放置的同名技能。如果你两种安装方式都用过，优先用
+> `npx @limccn/deepseek-vl-support@latest uninstall`；或使用 `skills remove --all`，
+> 在 1.9.0 上它只清理 CLI 自己装过的技能。
+
+另外两个容易踩的名字陷阱：`skills install` **不是**安装命令（它用于从 lockfile 恢复），
+也没有 `uninstall` 子命令。首次使用前先配置一次看图服务（环境变量，或
 `npx @limccn/deepseek-vl-support@latest install --target <你的agent>`，见
 [修改设置](#修改设置)）。
 
