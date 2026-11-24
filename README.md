@@ -1,6 +1,19 @@
-<img src="docs/banner/banner.png" alt="deepseek-vl-support — Give DeepSeek vision capabilities with external vision models" width="100%">
+<p align="center">
+  <img src="docs/brand/icon-128.png" width="96" height="96" alt="deepseek-vl-support">
+</p>
 
-# deepseek-vl-support
+<h1 align="center">deepseek-vl-support</h1>
+
+<p align="center">Give any text-only model the ability to see images.</p>
+
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-4FC3F7?style=flat-square" alt="License: MIT"></a>
+  <a href="https://www.npmjs.com/package/@limccn/deepseek-vl-support"><img src="https://img.shields.io/npm/v/@limccn%2Fdeepseek-vl-support?style=flat-square&color=4FC3F7" alt="npm version"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A5%2018-22304D?style=flat-square" alt="Node.js 18 or newer">
+  <img src="https://img.shields.io/badge/agents-22-22304D?style=flat-square" alt="Works with 22 agents">
+  <img src="https://img.shields.io/badge/runtime%20dependencies-0-22304D?style=flat-square" alt="Zero runtime dependencies">
+  <img src="https://img.shields.io/badge/status-sunset-FFB454?style=flat-square" alt="Project status: sunset">
+</p>
 
 > **中文说明** → [docs/README.zh-CN.md](./docs/README.zh-CN.md)
 

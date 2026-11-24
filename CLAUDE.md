@@ -49,7 +49,9 @@ One config feeds **five surfaces**:
 - Root `plugin.json` / `mcp.json` / `.mcp.json` / `marketplace.json` / `cordis.patch.yml` —
   Agent Plugins v1.0.0 + dsh payload, **committed to git** (the repo is the plugin install
   source for Copilot/Hermes and dsh git installs)
-- `docs/` — user docs (`README.zh-CN.md`, `banner/`); not packaged into the npm tarball
+- `docs/` — user docs (`README.zh-CN.md`); `brand/` (icon PNGs + palette/regen notes);
+  `banner/` (social preview only — the original banners were removed to keep the repo small
+  and live on in git history). Not packaged into the npm tarball
 
 ## Commands
 

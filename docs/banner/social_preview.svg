@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-labelledby="sp-title">
+  <title id="sp-title">deepseek-vl-support — vision for text-only models</title>
+  <!--
+    This is the layout half of the social preview. The character portrait is
+    composited on top at render time (left=820, top=140, 360x360 rounded), from
+    docs/banner/legacy/banner.png — see docs/brand/README.md for the exact
+    commands. Keeping the portrait out of the SVG keeps this file editable and
+    diffable.
+  -->
+
+  <defs>
+    <radialGradient id="glow" cx="0.18" cy="0.5" r="0.7">
+      <stop offset="0" stop-color="#4FC3F7" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#4FC3F7" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#22304D" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="640" fill="#0A0E1A"/>
+  <rect width="880" height="640" fill="url(#grid)" opacity="0.3"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+
+  <text x="96" y="268" font-family="'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif" font-size="56" font-weight="600" fill="#E8EEF9">deepseek-vl-support</text>
+  <text x="96" y="320" font-family="'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif" font-size="26" fill="#8FA3C0">Give any text-only model the ability to see images.</text>
+  <text x="96" y="370" font-family="'Consolas', monospace" font-size="18" fill="#8FA3C0" opacity="0.75">MIT · zero runtime dependencies · works with 22 agents</text>
+</svg>
