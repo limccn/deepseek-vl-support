@@ -7,9 +7,10 @@ allowed-tools: Bash Read
 
 # deepseek-vision — Describe images
 
-The current model (e.g. DeepSeek) is text-only and cannot see images. When the
-task requires understanding an image file, use this skill to obtain a precise
-text description and reason from it.
+The current model is text-only — many local models and some hosted releases
+still are — so it cannot see images directly. When the task requires
+understanding an image file, use this skill to obtain a precise text
+description and reason from it.
 
 ## When to use
 

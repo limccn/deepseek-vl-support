@@ -4,11 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-DeepSeek (and other text-only) models cannot see images. This package gives them vision:
+Text-only models cannot see images. This package gives them vision:
 whenever the model reads a picture, a vision service (any OpenAI-compatible
 `/v1/chat/completions` endpoint) describes it and the text description is injected into the
 model's context. Zero runtime dependencies, Node ≥ 18, MIT. `README.md` is the user-facing
 product doc (do not duplicate it here); `docs/README.zh-CN.md` is its Chinese counterpart.
+
+**Project status: sunset (docs-level, 2026-11).** DeepSeek's own API now accepts images
+(`deepseek-flash` on `https://api.deepseek.com`, see its vision guide), so the motivating
+premise is gone. The repo keeps shipping bug/security fixes and is NOT `npm deprecate`d;
+the README carries a sunset notice and a migration path. When touching user-facing copy,
+keep claims conditional ("text-only models", not "DeepSeek cannot see images") and do not
+copy volatile pricing/limit numbers. A `deepseek` preset (native vision) exists for users
+who still want a separate vision hop.
 
 One config feeds **five surfaces**:
 1. `describe` CLI — `npx @limccn/deepseek-vl-support describe <file> [question] [--json]`

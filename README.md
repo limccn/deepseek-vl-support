@@ -4,10 +4,34 @@
 
 > **中文说明** → [docs/README.zh-CN.md](./docs/README.zh-CN.md)
 
+> **Project status — sunset notice.** The premise this project was built on no longer
+> holds: **DeepSeek's own API now accepts images.** `deepseek-flash` on
+> <https://api.deepseek.com> takes image input directly (see the
+> [vision guide](https://api-docs.deepseek.com/guides/vision/)), so most people no longer
+> need a separate vision service at all.
+
+If your coding model can see images on its own, the recommended path is to remove this
+package and talk to the model directly:
+
+```bash
+npx @limccn/deepseek-vl-support@latest uninstall
+```
+
+**The package still works and is still maintained.** Bug and security fixes keep shipping,
+nothing is deprecated on npm, and no features have been removed. Keep using it if your
+coding model is genuinely text-only, or if you prefer routing images to a third-party
+endpoint — the installer now offers a **DeepSeek (native vision)** preset for exactly that
+case.
+
+Two limits are worth knowing before you migrate: DeepSeek bills images at up to ~1024
+tokens each, and images placed in `assistant` messages are rejected. Current numbers live
+in the official guide — check there rather than here.
+
 ## What this does
 
-Some AI models (like DeepSeek) can read your files, but they **cannot see pictures**.
-Screenshots of errors, UI mockups, charts — invisible to them.
+Some AI models — many text-only releases, local models, and older DeepSeek versions — can
+read your files but **cannot see pictures**. Screenshots of errors, UI mockups, charts —
+invisible to them.
 
 This small tool gives them "eyes". Once installed, whenever the model tries to read a
 picture, the tool sends it to a vision service of your choice (Moonshot, OpenRouter,
@@ -548,6 +572,7 @@ you configure manually:
 
 | Service | base URL | Example model |
 |---|---|---|
+| DeepSeek (native vision) | `https://api.deepseek.com/v1` | `deepseek-flash` |
 | Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-32k-vision-preview` |
 | OpenRouter | `https://openrouter.ai/api/v1` | `qwen/qwen2.5-vl-72b-instruct` |
 | MiniMax | `https://api.minimaxi.com/v1` | `MiniMax-VL-01` |
@@ -560,6 +585,11 @@ you configure manually:
 | llama.cpp (local) | `http://localhost:8080/v1` | `llava` (`llama-server -m llava.gguf`) |
 | vLLM (local) | `http://localhost:8000/v1` | `deepseek-ai/deepseek-vl2` |
 | LM Studio (local) | `http://localhost:1234/v1` | `qwen2.5-vl-7b-instruct` |
+
+> Vision providers retire model ids without much notice — the Moonshot example above was
+> already gone when this line was written. After configuring, run
+> `npx @limccn/deepseek-vl-support@latest doctor`; its model check against `/v1/models` is
+> the source of truth, not this table.
 
 ## Everyday commands
 

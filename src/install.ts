@@ -279,6 +279,11 @@ export interface Preset {
 // Preset order follows D2: remote APIs first, local endpoints last.
 export const PRESETS: Preset[] = [
   { id: "openrouter", label: "OpenRouter (cloud)", baseUrl: "https://openrouter.ai/api/v1", model: "qwen/qwen2.5-vl-72b-instruct" },
+  // DeepSeek's own API now accepts images, so a DeepSeek-native preset is the
+  // recommended destination for users who still want a separate vision hop.
+  // Kept next to openrouter (not first) so the long-standing default stays
+  // unambiguous: presetMenuSpec defaults to "openrouter".
+  { id: "deepseek", label: "DeepSeek (native vision)", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-flash" },
   { id: "moonshot", label: "Moonshot (cloud)", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-32k-vision-preview" },
   { id: "minimax", label: "MiniMax (cloud)", baseUrl: "https://api.minimaxi.com/v1", model: "MiniMax-VL-01" },
   { id: "zhipu", label: "Zhipu GLM (cloud)", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4v-flash" },

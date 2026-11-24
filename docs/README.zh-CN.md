@@ -4,10 +4,28 @@
 
 > **English** → [README.md](../README.md)
 
+> **项目状态——sunset 声明。** 这个项目成立的前提已经改变：**DeepSeek 官方 API 现在
+> 直接接受图片输入**。`deepseek-flash` 在 <https://api.deepseek.com> 上原生支持图像
+> （见[视觉指南](https://api-docs.deepseek.com/zh-cn/guides/vision/)），大多数人不再
+> 需要单独接一个"看图服务"。
+
+如果你的编码模型本身就能看图，推荐的做法是卸载本工具、直接使用模型：
+
+```bash
+npx @limccn/deepseek-vl-support@latest uninstall
+```
+
+**本包仍然可用，也仍在维护。** bug 修复与安全修复会继续发布，npm 上没有任何弃用标记，
+功能也没有被删除。如果你的编码模型确实是纯文本的，或你更愿意把图片转给第三方服务，
+可以继续使用——安装器现已提供 **DeepSeek（原生视觉）** 预设，正是为这种情况准备的。
+
+迁移前有两个限制值得了解：DeepSeek 对每张图片按最多约 1024 tokens 计费，且
+`assistant` 消息中的图片会被拒绝。具体数值以官方指南为准，不要以本文档为准。
+
 ## 它能做什么
 
-有些 AI 模型（比如 DeepSeek）能读文字，却**看不了图片**。报错截图、界面草图、图表、
-手写笔记照片——对它们来说都是"看不见"的。
+有些 AI 模型——不少纯文本模型、本地模型，以及较早版本的 DeepSeek——能读文字，却
+**看不了图片**。报错截图、界面草图、图表、手写笔记照片——对它们来说都是"看不见"的。
 
 这个小工具就是给它们装上"眼睛"。装好之后，每当模型想读一张图片，工具会把图片发给
 一家你选的"看图服务"（Moonshot、OpenRouter、SiliconFlow、Ollama……），拿回一段详细
@@ -534,6 +552,7 @@ npx @limccn/deepseek-vl-support@latest describe 图片路径.png
 
 | 服务 | base URL | 示例模型 |
 |---|---|---|
+| DeepSeek（原生视觉） | `https://api.deepseek.com/v1` | `deepseek-flash` |
 | Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-32k-vision-preview` |
 | OpenRouter | `https://openrouter.ai/api/v1` | `qwen/qwen2.5-vl-72b-instruct` |
 | MiniMax | `https://api.minimaxi.com/v1` | `MiniMax-VL-01` |
@@ -546,6 +565,10 @@ npx @limccn/deepseek-vl-support@latest describe 图片路径.png
 | llama.cpp（本地） | `http://localhost:8080/v1` | `llava`（`llama-server -m llava.gguf`） |
 | vLLM（本地） | `http://localhost:8000/v1` | `deepseek-ai/deepseek-vl2` |
 | LM Studio（本地） | `http://localhost:1234/v1` | `qwen2.5-vl-7b-instruct` |
+
+> 各家服务商会不定期下线模型 id——上表中的 Moonshot 示例在写下这句话时就已经下线了。
+> 配置完成后请运行 `npx @limccn/deepseek-vl-support@latest doctor`，它以 `/v1/models`
+> 的实际返回为准，比这张表可靠。
 
 ## 常用命令
 

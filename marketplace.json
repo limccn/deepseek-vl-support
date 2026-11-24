@@ -4,14 +4,14 @@
     "name": "limccn"
   },
   "metadata": {
-    "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
+    "description": "Vision for text-only models (e.g. DeepSeek) via MCP tools and a skill",
     "version": "0.3.0"
   },
   "plugins": [
     {
       "name": "deepseek-vl-support",
       "source": ".",
-      "description": "Vision for text-only models (DeepSeek) via MCP tools and a skill",
+      "description": "Vision for text-only models (e.g. DeepSeek) via MCP tools and a skill",
       "version": "0.3.0",
       "author": {
         "name": "limccn"
