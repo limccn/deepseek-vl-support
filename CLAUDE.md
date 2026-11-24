@@ -126,6 +126,18 @@ activate with `/reload-plugins`), `dsh` (shared skill, rank 200; prefers
 `dsh plugin --profile web add @limccn/deepseek-vl-support@latest` — native describe_image +
 vision_status tools via cordis patch).
 
+**dsh patch-row invariant** (`cordis.patch.yml`): the `insert[].name` value is a *module
+specifier*, not a display name — it must equal `package.json` `name` exactly and stay
+single-quoted (a bare YAML scalar cannot start with `@`; js-yaml rejects it). The 0.3.0
+scoped rename left it at the unscoped `deepseek-vl-support`, which fails at boot with
+`ERR_MODULE_NOT_FOUND` while `--dump-config` still prints the row — dumps are not proof of
+health. `tests/dsh-plugin.test.ts` derives the expected value from `package.json` for this
+reason. Deps: `@deepseek-ai/dsh-tools@^0.2.2-rc.5` (its npm `latest` tag is stale at
+`0.0.1-rc.1` — never use `latest`), `@deepseek-ai/cordis@~4.1.0`, `engines.dsh` declares the
+verified range. **A global install of this package shadows the profile's copy** (dsh resolves
+bundles from its own installation), so e2e must remove/hide the global copy first —
+`--patch` overlays do not fix it (`- id:` won't update, `- insert:` duplicates the id).
+
 **Plugin clients** (always global; materialize `~/.deepseek-vl/plugin/` = exactly
 `plugin.json` + `mcp.json` + `.mcp.json` + `skills/`, then register): `copilot`
 (`copilot plugin install` + marketplace add, or `enabledPlugins` in `~/.copilot/settings.json`
@@ -236,6 +248,9 @@ marketplace shim + uninstall keeps registration, NanoClaw template copy / no sym
   (plugin-sourced server listed); codex / copilot / pi / omp / dsh real-machine e2e (dsh
   both npm + git source; pi 0.84.2 `read` interception incl. the ENAMETOOLONG fix; omp 17.3.7
   with `bun` runtime note: a machine with omp but no bun needs `npm i -g bun`).
+  dsh 0.2.2-rc.5 activation re-verified 2026-11-24: old patch → `1 entry did not activate`
+  / `ERR_MODULE_NOT_FOUND`; fixed row → clean boot (negative/positive control, global copy
+  hidden). Tool invocation in a real LLM session still unverified.
 - **Still user-owned TODOs**: interactive session-level checks for Copilot (this machine's
   account gets CAPIError 400 — model authorization issue, not the plugin), Kiro/OpenClaw/
   Hermes/Grok/NanoClaw client machines, uninstall command names R2 (`openclaw plugins
@@ -310,7 +325,9 @@ section pins the version — after upgrading, re-run `install --update` to refre
 - [ ] `describe --data-uri "data:image/png;base64,<1px png>"` smoke in a configured project
 - [ ] dsh real-machine e2e (user-owned): npm + git sources install, `deepseek-vl` layer in
       `dsh --profile web --dump-config`, describe_image/vision_status called in a real LLM
-      session; `remove` + restart cleans up
+      session; `remove` + restart cleans up. *(0.2.2-rc.5 boot/activation verified 2026-11-24;
+      tool invocation in a session still open. Hide any global install first — it shadows the
+      profile copy.)*
 - [ ] codex / copilot real-machine e2e (user-owned; this machine's sandbox blocks elevated
       session tool calls and the cc-switch proxy returns 400 on DeepSeek thinking-mode —
       unrelated to the package)

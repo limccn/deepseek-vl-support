@@ -25,7 +25,8 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=18",
+    "dsh": ">=0.2.2-rc.5 <0.3.0"
   },
   "keywords": [
     "deepseek",
@@ -59,8 +60,8 @@
     "verify": "npm run build && npm run typecheck && npm run test"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/dsh-tools": "^0.2.2-rc.5",
     "@types/node": "^26.2.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"

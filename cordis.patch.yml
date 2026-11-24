@@ -1,9 +1,12 @@
 # DeepSeek Harness (dsh) plugin activation - see package.json "dsh" key.
-# Top-level array required by dsh's bundle patch layer. The `name` resolves
-# through the package main entry (dist/dsh-plugin.js); `id` stays stable so
-# re-installs replace rather than duplicate. No config: this plugin reads the
-# same VISION_* env / ~/.deepseek-vl/config.json chain as every other surface.
+# Top-level array required by dsh's bundle patch layer. The `name` must equal
+# package.json "name" exactly: dsh resolves it as an import specifier, so a
+# mismatch fails with ERR_MODULE_NOT_FOUND and the entry silently does not
+# activate. Keep it single-quoted - a bare YAML scalar cannot start with `@`
+# (js-yaml rejects it). `id` stays stable so re-installs replace rather than
+# duplicate. No config: this plugin reads the same VISION_* env /
+# ~/.deepseek-vl/config.json chain as every other surface.
 - insert:
     - id: deepseek-vl
-      name: deepseek-vl-support
+      name: '@limccn/deepseek-vl-support'
       config: {}

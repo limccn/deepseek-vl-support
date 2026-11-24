@@ -66,11 +66,25 @@ test("package.json dsh manifest: bundle.patch → cordis.patch.yml, main → plu
   assert.ok(pkg.keywords?.includes("dsh-plugin"), "dsh-plugin keyword for the dsh discovery topic");
 });
 
-test("cordis.patch.yml: top-level array, insert row with stable id and package name", () => {
+test("cordis.patch.yml: top-level array, insert row with stable id and the package's own name", () => {
   const y = readFileSync(join(ROOT, "cordis.patch.yml"), "utf8");
+  // dsh treats this value as an import specifier, so it must equal package.json
+  // "name" exactly — a stale literal here makes the entry fail with
+  // ERR_MODULE_NOT_FOUND while --dump-config still prints the row. Deriving the
+  // expected value from package.json is what keeps a future rename from
+  // silently breaking plugin activation (the 0.3.0 scoped rename did exactly
+  // that).
+  const pkgName = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).name as string;
   assert.match(y, /(^|\n)- insert:/m, "top-level array element opens with - insert:");
   assert.ok(y.includes("id: deepseek-vl"), "stable id deepseek-vl (matches MCP_SERVER_NAME / plugin name)");
-  assert.ok(y.includes("name: deepseek-vl-support"), "name resolves the package main entry");
+  assert.ok(
+    y.includes(`name: '${pkgName}'`),
+    `name is the quoted package.json name (${pkgName}) — dsh resolves it as an import specifier`,
+  );
+  assert.ok(
+    !y.includes("name: deepseek-vl-support"),
+    "the unscoped legacy package name is gone (it resolves to nothing since 0.3.0)",
+  );
   assert.ok(y.includes("config: {}"), "empty config — plugin reads the VISION_* env / config.json chain");
   assert.match(y, /^[\x00-\x7F]*$/, "patch file is pure ASCII");
 });
@@ -82,6 +96,15 @@ test("plugin source exports name/inject/apply (typed import of src/dsh-plugin.ts
   assert.equal(mod.name, "deepseek-vl", "exported plugin name");
   assert.deepEqual(mod.inject, ["tools"], "inject = ['tools']");
   assert.equal(typeof mod.apply, "function", "apply(ctx) registers the tools");
+});
+
+test("apply(ctx) registers describe_image + vision_status on the tools service", async () => {
+  const mod = await import("../src/dsh-plugin.ts");
+  const registered: string[] = [];
+  // Minimal stand-in for cordis' Context: apply() only touches ctx.tools.register.
+  const ctx = { tools: { register: (definition: { name: string }) => registered.push(definition.name) } };
+  mod.apply(ctx as never);
+  assert.deepEqual(registered, ["describe_image", "vision_status"], "both MCP-parity tools are registered");
 });
 
 test("dist/dsh-plugin.js exists and loads as ESM with the same exports (shipped artifact)", () => {
